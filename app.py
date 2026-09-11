@@ -71,6 +71,12 @@ st.markdown("""
     [data-testid="stExpander"] [data-testid="stExpanderDetails"] p {
         color:#243b53 !important;
     }
+    [data-testid="stMetricLabel"] p { color:#243b53 !important; }
+    [data-testid="stExpander"] details,
+    [data-testid="stExpander"] summary,
+    [data-testid="stExpander"] [data-testid="stExpanderDetails"] {
+        background:#ffffff !important;
+    }
     .block-container { max-width: 1480px; padding-top: 1.4rem; padding-bottom: 3rem; }
     .hero {
         position: relative; overflow: hidden; padding: 2.25rem 2.5rem; margin: .25rem 0 1.7rem;

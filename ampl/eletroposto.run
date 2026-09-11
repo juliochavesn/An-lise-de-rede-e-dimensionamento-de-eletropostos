@@ -1,0 +1,14 @@
+# Arquivo opcional de execução direta no AMPL.
+# O fluxo principal do projeto usa Python + amplpy.
+
+reset;
+
+model ampl/eletroposto.mod;
+data outputs/scenario_base.dat;
+
+option solver highs;
+
+solve;
+
+display Total_Cost;
+display pv_size_kw, bess_e_kwh, bess_p_kw;

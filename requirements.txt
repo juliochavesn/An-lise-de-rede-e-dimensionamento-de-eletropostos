@@ -1,0 +1,18 @@
+--index-url https://pypi.ampl.com
+--extra-index-url https://pypi.org/simple
+ampl_module_base
+ampl_module_highs
+numpy
+pandas
+matplotlib
+amplpy
+pvlib
+geopandas
+pyogrio
+pyproj
+shapely
+pyarrow
+gdown>=5.2,<6
+streamlit
+streamlit-folium
+requests

@@ -1,0 +1,36 @@
+# Dados e artefatos locais (não enviar ao GitHub)
+Dados BDGD/
+outputs/
+backups/
+tmp/
+relatorio/
+Framework_Otimizacao_Eletropostos_v2.pdf
+.venv/
+venv/
+
+# Segredos e configuração privada
+.streamlit/secrets.toml
+.env
+.env.*
+!.env.example
+
+# Python, testes e sistema operacional
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.DS_Store
+
+# Arquivos temporários e logs
+*.log
+*.tmp
+*.part
+~$*
+
+# Bases geoespaciais e pacotes grandes fora da pasta padrão
+*.gdb/
+*.gdb.zip
+*.gpkg
+*.parquet

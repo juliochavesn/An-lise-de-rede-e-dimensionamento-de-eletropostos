@@ -65,7 +65,11 @@ def render_online():
     if st.session_state.get("online_signature") != signature:
         st.session_state.pop("preliminary_result", None)
         st.session_state.online_signature = signature
-    st.subheader("Análise preliminar — APIs online")
+    st.markdown("""
+    <div class="section-eyebrow">Triagem nacional</div>
+    <div class="section-title">Análise preliminar por APIs públicas</div>
+    <div class="section-copy">Caracterize o entorno antes de carregar uma BDGD detalhada. Esta etapa orienta a investigação, mas não declara potência disponível.</div>
+    """, unsafe_allow_html=True)
     st.caption("Consulta nacional de consumidores PJ em MT/AT. Geometria de rede apenas onde o serviço regional integrado a publica; isso não é cobertura elétrica nacional completa.")
     st.code(f"{lat:.7f}, {lon:.7f}")
     if st.button("Consultar APIs neste ponto", type="primary"):
@@ -141,6 +145,9 @@ def render_online():
         if report.exists():
             st.download_button("Baixar relatório preliminar", report.read_bytes(), report.name)
         st.caption(f"Arquivos desta análise: {result['output_dir']}")
-    st.divider()
-    st.caption("Autor: Júlio Cesar C. Nunes · FEEC/UNICAMP")
-    st.caption("Contato: [j298971@dac.unicamp.br](mailto:j298971@dac.unicamp.br)")
+    st.markdown("""
+    <div class="footer-card">
+      <span><strong>Júlio Cesar C. Nunes</strong> · FEEC/UNICAMP</span>
+      <span><a href="mailto:j298971@dac.unicamp.br">j298971@dac.unicamp.br</a> · Ferramenta de apoio ao planejamento</span>
+    </div>
+    """, unsafe_allow_html=True)

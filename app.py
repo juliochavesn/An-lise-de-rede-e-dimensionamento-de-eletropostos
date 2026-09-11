@@ -22,15 +22,83 @@ from src.service_policy import describe_policy
 from src.cloud_bdgd import CLOUD_DATASETS, load_cloud_coverage, prepare_cloud_point
 
 
-st.set_page_config(page_title="Eletroposto + BDGD", page_icon="⚡", layout="wide")
-st.title("Planejamento locacional de eletropostos")
-st.caption("Triagem online por APIs ou análise detalhada com BDGD. Capacidade estimada não é autorização de acesso.")
+st.set_page_config(
+    page_title="Atlas Eletropostos | FEEC/UNICAMP",
+    page_icon="⚡",
+    layout="wide",
+    initial_sidebar_state="auto",
+)
+
+st.markdown("""
+<style>
+    :root {
+        --brand-navy: #071b33;
+        --brand-blue: #0b63ce;
+        --brand-cyan: #19b7c9;
+        --brand-mint: #20c997;
+        --surface: #f6f9fc;
+        --line: #dbe6f1;
+    }
+    .stApp {
+        background:
+            radial-gradient(circle at 88% 2%, rgba(25,183,201,.10), transparent 24rem),
+            linear-gradient(180deg, #ffffff 0%, var(--surface) 100%);
+    }
+    [data-testid="stHeader"] { background: rgba(255,255,255,.82); backdrop-filter: blur(14px); }
+    [data-testid="stSidebar"] { border-right: 1px solid var(--line); }
+    [data-testid="stSidebar"] > div { background: linear-gradient(180deg,#f8fbff 0%,#eef5fb 100%); }
+    .block-container { max-width: 1480px; padding-top: 1.4rem; padding-bottom: 3rem; }
+    .hero {
+        position: relative; overflow: hidden; padding: 2.25rem 2.5rem; margin: .25rem 0 1.7rem;
+        border-radius: 24px; color: white;
+        background: linear-gradient(120deg, #061a31 0%, #0a3970 55%, #087e91 100%);
+        box-shadow: 0 18px 55px rgba(7,27,51,.18);
+    }
+    .hero:after { content:""; position:absolute; width:290px; height:290px; right:-70px; top:-130px;
+        border:1px solid rgba(255,255,255,.25); border-radius:50%; box-shadow:0 0 0 45px rgba(255,255,255,.035),0 0 0 90px rgba(255,255,255,.025); }
+    .hero-kicker { color:#70e1ea; font-size:.78rem; font-weight:800; letter-spacing:.13em; text-transform:uppercase; }
+    .hero h1 { color:white; font-size:clamp(2rem,4vw,3.6rem); line-height:1.02; letter-spacing:-.045em; margin:.45rem 0 .8rem; max-width:850px; }
+    .hero p { color:#d9edf5; font-size:1.08rem; line-height:1.6; max-width:810px; margin:0; }
+    .hero-tags { display:flex; flex-wrap:wrap; gap:.55rem; margin-top:1.25rem; }
+    .hero-tag { padding:.38rem .75rem; border:1px solid rgba(255,255,255,.22); border-radius:999px; background:rgba(255,255,255,.09); font-size:.82rem; }
+    .section-eyebrow { color:var(--brand-blue); font-size:.75rem; font-weight:800; letter-spacing:.11em; text-transform:uppercase; margin-bottom:.15rem; }
+    .section-title { color:var(--brand-navy); font-size:1.65rem; font-weight:760; letter-spacing:-.025em; margin-bottom:.25rem; }
+    .section-copy { color:#52657a; margin-bottom:1.2rem; }
+    div[data-testid="stMetric"] { background:rgba(255,255,255,.9); border:1px solid var(--line); border-radius:16px; padding:1rem 1.1rem; box-shadow:0 7px 24px rgba(25,55,88,.06); }
+    div[data-testid="stMetricValue"] { color:var(--brand-navy); }
+    div[data-testid="stExpander"], div[data-testid="stDataFrame"] { border-color:var(--line); border-radius:14px; overflow:hidden; }
+    .stButton > button, .stDownloadButton > button, .stLinkButton > a { border-radius:12px; min-height:2.8rem; font-weight:700; transition:transform .15s ease, box-shadow .15s ease; }
+    .stButton > button:hover, .stDownloadButton > button:hover, .stLinkButton > a:hover { transform:translateY(-1px); box-shadow:0 8px 20px rgba(11,99,206,.14); }
+    [data-testid="stForm"] { background:rgba(255,255,255,.6); border:1px solid var(--line); border-radius:16px; padding:1rem; }
+    .footer-card { margin-top:2.5rem; padding:1.2rem 1.4rem; border-top:1px solid var(--line); color:#52657a; display:flex; justify-content:space-between; gap:1rem; }
+    @media (max-width: 768px) {
+        .block-container { padding: .65rem .85rem 2rem; }
+        .hero { padding:1.45rem 1.25rem; border-radius:18px; margin-top:.15rem; }
+        .hero h1 { font-size:2.05rem; max-width:92%; }
+        .hero p { font-size:.95rem; }
+        .hero-tag { font-size:.72rem; }
+        .section-title { font-size:1.4rem; }
+        div[data-testid="stHorizontalBlock"] { gap:.75rem; }
+        div[data-testid="stMetric"] { padding:.8rem; }
+        iframe[title="streamlit_folium.st_folium"] { height:430px !important; }
+        .footer-card { flex-direction:column; }
+        [data-testid="stDataFrame"] { max-width:calc(100vw - 1.7rem); overflow-x:auto; }
+    }
+</style>
+<div class="hero">
+  <div class="hero-kicker">Pesquisa aplicada · FEEC/UNICAMP</div>
+  <h1>Inteligência de rede para eletropostos</h1>
+  <p>Da escolha do ponto ao dimensionamento técnico-econômico: conectamos dados da distribuição, geração solar, armazenamento e recarga inteligente em uma única análise.</p>
+  <div class="hero-tags"><span class="hero-tag">BDGD 2025</span><span class="hero-tag">Otimização anual</span><span class="hero-tag">Solar + BESS</span><span class="hero-tag">Qualidade de atendimento</span></div>
+</div>
+""", unsafe_allow_html=True)
 
 analysis_mode = st.sidebar.radio(
     "Modo de análise",
     ["Preliminar — APIs online", "Detalhada — BDGD em nuvem", "Detalhada — BDGD local"],
     key="analysis_mode",
 )
+st.sidebar.caption("① Escolha a fonte  ·  ② Selecione o ponto  ·  ③ Analise e simule")
 if st.session_state.get("previous_analysis_mode") != analysis_mode:
     for key in ("network_result", "simulation_result", "preliminary_result", "processed_click"):
         st.session_state.pop(key, None)
@@ -267,7 +335,12 @@ try:
 except Exception as exc:
     map_data, map_error = None, str(exc)
 
-map_col, action_col = st.columns([2.1, 1], gap="large")
+st.markdown("""
+<div class="section-eyebrow">Etapa 1 · Diagnóstico locacional</div>
+<div class="section-title">Rede elétrica e ponto de conexão</div>
+<div class="section-copy">Explore a infraestrutura disponível, confirme o alimentador e execute a análise antes do dimensionamento.</div>
+""", unsafe_allow_html=True)
+map_col, action_col = st.columns([1.9, 1], gap="large")
 with map_col:
     bounds = [[-34, -74], [6, -34]] if national_mode or coverage is None else coverage["bounds"]
     map_view = folium.Map(
@@ -333,7 +406,7 @@ with map_col:
     if show_stations:
         add_ocm_layer(map_view, lat, lon, station_radius, include_uncertain)
     folium.LayerControl().add_to(map_view)
-    event = st_folium(map_view, height=630, use_container_width=True,
+    event = st_folium(map_view, height=560, use_container_width=True,
                       key=f"network_map_{st.session_state.get('map_revision', 0)}",
                       returned_objects=["last_clicked"])
     click = event.get("last_clicked") if event else None
@@ -434,7 +507,7 @@ if "network_result" in st.session_state:
     result = st.session_state.network_result
     assessment, critical = result["assessment"], result["critical"]
     st.divider()
-    st.header("Análise da rede")
+    st.markdown('<div class="section-eyebrow">Etapa 2 · Capacidade</div><div class="section-title">Análise da rede</div>', unsafe_allow_html=True)
     st.caption(f"Ponto analisado: {lat:.7f}, {lon:.7f}")
     reference = result.get("bdgd_reference_date") or assessment.get("residual_capacity", {}).get("bdgd_reference_date")
     profile_start = result.get("network_profile_calendar_start")
@@ -509,7 +582,7 @@ if "network_result" in st.session_state:
 if "simulation_result" in st.session_state:
     result = st.session_state.simulation_result
     st.divider()
-    st.header("Resultado da simulação")
+    st.markdown('<div class="section-eyebrow">Etapa 3 · Otimização</div><div class="section-title">Solução otimizada</div>', unsafe_allow_html=True)
     simulation_diagnostic = result.get("diagnostic", {})
     run_inputs = result.get("inputs", {})
     st.caption("Política desta execução: " + describe_policy(run_inputs.get("service_policy")))
@@ -620,6 +693,9 @@ if "simulation_result" in st.session_state:
     st.caption(f"Arquivos desta simulação: {output}")
 
 
-st.divider()
-st.caption("Autor: Júlio Cesar C. Nunes · FEEC/UNICAMP")
-st.caption("Contato: [j298971@dac.unicamp.br](mailto:j298971@dac.unicamp.br)")
+st.markdown("""
+<div class="footer-card">
+  <span><strong>Júlio Cesar C. Nunes</strong> · FEEC/UNICAMP</span>
+  <span><a href="mailto:j298971@dac.unicamp.br">j298971@dac.unicamp.br</a> · Ferramenta de apoio ao planejamento</span>
+</div>
+""", unsafe_allow_html=True)

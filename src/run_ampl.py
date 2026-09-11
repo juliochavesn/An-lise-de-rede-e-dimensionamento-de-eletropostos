@@ -9,7 +9,31 @@ Este módulo usa amplpy para:
 - coletar variáveis e parâmetros para pós-processamento.
 """
 
+import os
+
 from amplpy import AMPL
+
+
+_LICENSE_READY = False
+
+
+def prepare_ampl_runtime(env=None):
+    """Ativa, quando configurada, a licença AMPL mantida fora do código."""
+    global _LICENSE_READY
+    if _LICENSE_READY:
+        return
+    env = os.environ if env is None else env
+    license_uuid = str(env.get("AMPL_LICENSE_UUID", "")).strip()
+    if license_uuid:
+        try:
+            from amplpy import modules
+            modules.activate(license_uuid)
+        except Exception as error:
+            raise RuntimeError(
+                "Não foi possível ativar a licença AMPL definida no ambiente. "
+                "Confirme o segredo AMPL_LICENSE_UUID e a conectividade do servidor."
+            ) from error
+    _LICENSE_READY = True
 
 
 class AmplSolveError(RuntimeError):
@@ -47,6 +71,7 @@ def solve_ampl_case(
     ampl : objeto AMPL com solução carregada.
     """
 
+    prepare_ampl_runtime()
     ampl = AMPL()
     # Evita falsa inviabilidade no presolve por arredondamento (ex.: 1e-15)
     # quando importação e limite contratual coincidem. Não é folga física em kW.

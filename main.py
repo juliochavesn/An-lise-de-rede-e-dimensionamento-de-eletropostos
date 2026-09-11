@@ -348,6 +348,17 @@ def run_base_scenarios():
                 ),
             )
         except AmplSolveError as error:
+            # Somente inviabilidade matemática pode ser apresentada como
+            # inviabilidade da solução. Estados como "?", "failure" ou
+            # "limit" normalmente indicam licença, solver ou ambiente.
+            if error.solve_result not in {
+                "infeasible", "infeasible_or_unbounded", "unbounded"
+            }:
+                detail = f" ({error.solve_message})" if error.solve_message else ""
+                raise RuntimeError(
+                    "Falha técnica do motor AMPL/HiGHS; o caso não foi "
+                    f"classificado como inviável. Estado: {error.solve_result}{detail}"
+                ) from error
             summary = _infeasible_summary(
                 config,
                 error.solve_result,

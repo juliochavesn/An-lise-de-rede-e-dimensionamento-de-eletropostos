@@ -6,7 +6,7 @@ import hashlib
 import os
 import secrets
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -81,10 +81,17 @@ def register_access(st: Any) -> dict[str, int] | None:
             visitor_hash = hashlib.sha256(
                 f"{salt}|{_client_identity(st)}".encode("utf-8")
             ).hexdigest()
-            connection.execute(
-                "INSERT INTO access_events(visitor_hash, accessed_at, access_date) VALUES (?, ?, ?)",
-                (visitor_hash, now.isoformat(timespec="seconds"), now.date().isoformat()),
-            )
+            last_row = connection.execute(
+                "SELECT accessed_at FROM access_events WHERE visitor_hash = ? "
+                "ORDER BY id DESC LIMIT 1",
+                (visitor_hash,),
+            ).fetchone()
+            last_access = datetime.fromisoformat(last_row[0]) if last_row else None
+            if last_access is None or now - last_access >= timedelta(minutes=30):
+                connection.execute(
+                    "INSERT INTO access_events(visitor_hash, accessed_at, access_date) VALUES (?, ?, ?)",
+                    (visitor_hash, now.isoformat(timespec="seconds"), now.date().isoformat()),
+                )
             total = connection.execute("SELECT COUNT(*) FROM access_events").fetchone()[0]
             devices = connection.execute(
                 "SELECT COUNT(DISTINCT visitor_hash) FROM access_events"

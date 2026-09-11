@@ -57,6 +57,15 @@ def _prepare_database(connection: sqlite3.Connection) -> str:
     connection.execute(
         "CREATE INDEX IF NOT EXISTS idx_access_events_date ON access_events(access_date)"
     )
+    version_row = connection.execute(
+        "SELECT value FROM settings WHERE key = 'counter_version'"
+    ).fetchone()
+    if not version_row or version_row[0] != "2":
+        # Remove apenas os eventos inflados pela primeira versão, que contava reconexões técnicas.
+        connection.execute("DELETE FROM access_events")
+        connection.execute(
+            "INSERT OR REPLACE INTO settings(key, value) VALUES ('counter_version', '2')"
+        )
     row = connection.execute("SELECT value FROM settings WHERE key = 'hash_salt'").fetchone()
     if row:
         return str(row[0])

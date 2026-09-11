@@ -47,8 +47,24 @@ st.markdown("""
             linear-gradient(180deg, #ffffff 0%, var(--surface) 100%);
     }
     [data-testid="stHeader"] { background: rgba(255,255,255,.82); backdrop-filter: blur(14px); }
-    [data-testid="stSidebar"] { border-right: 1px solid var(--line); }
+    [data-testid="stSidebar"] { border-right: 1px solid var(--line); color:#243b53; }
     [data-testid="stSidebar"] > div { background: linear-gradient(180deg,#f8fbff 0%,#eef5fb 100%); }
+    [data-testid="stSidebar"] h1,
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3,
+    [data-testid="stSidebar"] [data-testid="stWidgetLabel"] p,
+    [data-testid="stSidebar"] [data-testid="stCaptionContainer"] p,
+    [data-testid="stSidebar"] [data-baseweb="radio"] p,
+    [data-testid="stSidebar"] [data-baseweb="checkbox"] p {
+        color:#243b53 !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stWidgetLabel"] p { font-weight:650; }
+    [data-testid="stSidebar"] [data-testid="stCaptionContainer"] p { color:#52657a !important; }
+    [data-testid="stSidebar"] button,
+    [data-testid="stSidebar"] button p,
+    [data-testid="stSidebar"] [data-baseweb="select"] * {
+        color:#f8fafc !important;
+    }
     .block-container { max-width: 1480px; padding-top: 1.4rem; padding-bottom: 3rem; }
     .hero {
         position: relative; overflow: hidden; padding: 2.25rem 2.5rem; margin: .25rem 0 1.7rem;

@@ -4,6 +4,7 @@ outputs/
 backups/
 tmp/
 relatorio/
+.app_data/
 Framework_Otimizacao_Eletropostos_v2.pdf
 .venv/
 venv/

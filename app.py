@@ -20,6 +20,7 @@ from src.ocm_ui import add_ocm_layer
 from src.technical_ui import render_technical_panel
 from src.service_policy import describe_policy
 from src.cloud_bdgd import CLOUD_DATASETS, load_cloud_coverage, prepare_cloud_point
+from access_counter import register_access, render_access_footer
 
 
 st.set_page_config(
@@ -28,6 +29,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="auto",
 )
+access_metrics = register_access(st)
 
 st.markdown("""
 <style>
@@ -108,6 +110,7 @@ if st.session_state.get("previous_analysis_mode") != analysis_mode:
     st.session_state.previous_analysis_mode = analysis_mode
 if analysis_mode == "Preliminar — APIs online":
     render_online()
+    render_access_footer(st, access_metrics)
     st.stop()
 
 national_dir = Path(GRID_NETWORK["bdgd_path"]).parent / "Nacional"
@@ -699,3 +702,4 @@ st.markdown("""
   <span><a href="mailto:j298971@dac.unicamp.br">j298971@dac.unicamp.br</a> · Ferramenta de apoio ao planejamento</span>
 </div>
 """, unsafe_allow_html=True)
+render_access_footer(st, access_metrics)

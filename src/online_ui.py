@@ -70,10 +70,14 @@ def render_online():
         if show_pnl:
             pnl_radius = st.slider("Raio das rotas PNL (km)", 5, 50, 15, 5, key="online_pnl_radius")
             pnl_mode = st.selectbox(
-                "Visualização das rotas PNL", ["Saturação", "Fluxo total", "Corredores"],
+                "Visualização das rotas PNL",
+                ["Saturação", "Carregamento total", "Modal", "Corredores"],
                 key="online_pnl_mode",
             )
-            st.caption("A camada orienta a triagem logística; não representa demanda elétrica calculada.")
+            st.caption(
+                "PNL 2050: carregamentos modelados em toneladas. A saturação trimestral "
+                "se aplica apenas aos links rodoviários."
+            )
 
     lat, lon = st.session_state.latitude, st.session_state.longitude
     signature = (lat, lon, radius, tariff_subgroup, tariff_date.isoformat())
@@ -140,12 +144,29 @@ def render_online():
         a, b, c = st.columns(3)
         a.metric("Rota de carga mais próxima", f"{nearest['distance_km']:.2f} km")
         saturation = nearest.get("max_saturation")
-        b.metric("Saturação máxima", f"{saturation * 100:.1f}%" if saturation is not None else "Não informada")
+        b.metric(
+            "Saturação rodoviária máxima",
+            f"{saturation * 100:.1f}%" if saturation is not None else (
+                "Não aplicável" if not nearest["is_road"] else "Não informada"
+            ),
+        )
         c.metric("Trechos PNL no raio", pnl_data["segment_count"])
         st.write(
-            f"**Segmento:** {nearest['segment_id']} · **GTYPE:** {nearest['gtype']} · "
-            f"**Corredor:** {nearest['corridor']} · **Fluxo total PNL:** {nearest['total_flow']:,.0f}"
+            f"**Segmento:** {nearest['segment_id']} · "
+            f"**Modal:** {nearest['modal']} (`GTYPE = {nearest['gtype']}`) · "
+            f"**Corredor:** {nearest['corridor']} · "
+            f"**Carregamento total modelado:** {nearest['total_flow']:,.0f} t"
         )
+        if nearest.get("main_load_group"):
+            st.write(f"**Grupo de carga predominante:** {nearest['main_load_group']}")
+            composition = pd.DataFrame([
+                {"Grupo de carga": group, "Carregamento (t)": value}
+                for group, value in nearest["load_composition_t"].items()
+                if value > 0
+            ]).sort_values("Carregamento (t)", ascending=False)
+            if not composition.empty:
+                with st.expander("Composição do carregamento por grupo"):
+                    st.dataframe(composition, hide_index=True, use_container_width=True)
         st.warning(pnl_data["interpretation_warning"])
     if result:
         st.header("Caracterização do entorno — não é parecer de conexão")

@@ -23,7 +23,7 @@ As estimativas são instrumentos de triagem e pesquisa. Elas não substituem est
 
 As bases BDGD não são armazenadas neste repositório devido ao volume. A aplicação pode consultar os pacotes tratados no Google Drive sob demanda. O modo local continua disponível quando uma BDGD é instalada pelo usuário.
 
-A rede logística PNL também é obtida do Google Drive somente quando sua camada é ativada. O arquivo é mantido em cache temporário e as consultas usam recortes espaciais. Enquanto o dicionário e as unidades do estudo não estiverem documentados, os campos `T_TOTAL` e `GTYPE` são exibidos como atributos originais e não são convertidos automaticamente em veículos ou potência de recarga.
+A rede de transportes do PNL 2050 também é obtida do Google Drive somente quando sua camada é ativada. O arquivo é mantido em cache temporário e as consultas usam recortes espaciais. A interface aplica o dicionário oficial da Infra S.A. para identificar os modais e apresentar os carregamentos em toneladas. As saturações trimestrais são interpretadas somente para links rodoviários (`GTYPE = 1`). Os carregamentos modelados não são convertidos automaticamente em veículos ou potência de recarga.
 
 ## Execução local
 

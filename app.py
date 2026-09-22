@@ -316,9 +316,12 @@ with st.sidebar:
         pnl_radius_km = st.slider("Raio das rotas PNL (km)", 5, 50, 15, 5)
         pnl_display_mode = st.selectbox(
             "Visualização das rotas PNL",
-            ["Saturação", "Fluxo total", "Corredores"],
+            ["Saturação", "Carregamento total", "Modal", "Corredores"],
         )
-        st.caption("Diagnóstico logístico: não altera automaticamente a demanda do eletroposto.")
+        st.caption(
+            "PNL 2050: carregamentos modelados em toneladas. A saturação trimestral "
+            "se aplica apenas aos links rodoviários."
+        )
     threshold_kw = st.number_input("Limiar crítico (kW)", min_value=0.0, value=250.0, step=25.0)
     mode_label = st.selectbox("Horizonte da simulação", [f"Anual ({SCENARIO_ANNUAL['horizon_h']:.0f} h)", "Diário (24 h)"])
     st.caption(f"Recurso solar: {PV_SYSTEM['radiation_database']} · PVGIS 5.3 · ano {PV_SYSTEM['year']}. "
@@ -534,18 +537,31 @@ with action_col:
         with st.expander("Diagnóstico logístico PNL", expanded=True):
             st.metric("Distância à rota de carga mais próxima", f"{nearest_pnl['distance_km']:.2f} km")
             st.write(f"**Segmento PNL:** {nearest_pnl['segment_id']}")
-            st.write(f"**Tipo cadastrado (GTYPE):** {nearest_pnl['gtype']}")
+            st.write(f"**Modal:** {nearest_pnl['modal']} (`GTYPE = {nearest_pnl['gtype']}`)")
             st.write(f"**Corredor:** {nearest_pnl['corridor']}")
             saturation = nearest_pnl.get("max_saturation")
             st.write("**Saturação máxima:** " + (
                 f"{saturation * 100:.1f}% · {nearest_pnl['saturation_label']}"
-                if saturation is not None else "não informada"
+                if saturation is not None else (
+                    "não aplicável ao modal" if not nearest_pnl["is_road"] else "não informada"
+                )
             ))
-            st.write(f"**Fluxo total PNL:** {nearest_pnl['total_flow']:,.0f}")
+            st.write(f"**Carregamento total modelado:** {nearest_pnl['total_flow']:,.0f} t")
+            if nearest_pnl.get("main_load_group"):
+                st.write(f"**Grupo de carga predominante:** {nearest_pnl['main_load_group']}")
+                composition = pd.DataFrame([
+                    {"Grupo de carga": group, "Carregamento (t)": value}
+                    for group, value in nearest_pnl["load_composition_t"].items()
+                    if value > 0
+                ]).sort_values("Carregamento (t)", ascending=False)
+                if not composition.empty:
+                    with st.expander("Composição do carregamento por grupo"):
+                        st.dataframe(composition, hide_index=True, use_container_width=True)
             st.caption(
                 f"{pnl_data['segment_count']} trechos no raio; "
+                f"{pnl_data['road_segment_count']} rodoviários; "
                 f"{pnl_data['corridor_segment_count']} classificados como corredores; "
-                f"{pnl_data['high_saturation_count']} com saturação ≥80%."
+                f"{pnl_data['high_saturation_count']} links rodoviários com saturação ≥80%."
             )
             st.warning(pnl_data["interpretation_warning"])
 

@@ -20,7 +20,7 @@ from src.ocm_ui import add_ocm_layer
 from src.technical_ui import render_technical_panel
 from src.service_policy import describe_policy
 from src.cloud_bdgd import CLOUD_DATASETS, load_cloud_coverage, prepare_cloud_point
-from src.pnl_routes import add_pnl_layer, load_pnl_window
+from src.pnl_routes import add_pnl_layer, gtype_label, load_pnl_window
 from access_counter import register_access, render_access_footer
 
 
@@ -234,7 +234,9 @@ def cached_map(latitude: float, longitude: float, radius_km: float, source_path)
 
 
 @st.cache_data(show_spinner=False, ttl=86400)
-def cached_pnl_window(latitude: float, longitude: float, radius_km: float):
+def cached_pnl_window(latitude: float, longitude: float, radius_km: float,
+                      schema_version: str = "pnl-dictionary-v1"):
+    del schema_version
     return load_pnl_window(latitude, longitude, radius_km)
 
 
@@ -537,13 +539,15 @@ with action_col:
         with st.expander("Diagnóstico logístico PNL", expanded=True):
             st.metric("Distância à rota de carga mais próxima", f"{nearest_pnl['distance_km']:.2f} km")
             st.write(f"**Segmento PNL:** {nearest_pnl['segment_id']}")
-            st.write(f"**Modal:** {nearest_pnl['modal']} (`GTYPE = {nearest_pnl['gtype']}`)")
+            modal = nearest_pnl.get("modal") or gtype_label(nearest_pnl.get("gtype"))
+            is_road = nearest_pnl.get("is_road", nearest_pnl.get("gtype") == 1)
+            st.write(f"**Modal:** {modal} (`GTYPE = {nearest_pnl['gtype']}`)")
             st.write(f"**Corredor:** {nearest_pnl['corridor']}")
             saturation = nearest_pnl.get("max_saturation")
             st.write("**Saturação máxima:** " + (
                 f"{saturation * 100:.1f}% · {nearest_pnl['saturation_label']}"
                 if saturation is not None else (
-                    "não aplicável ao modal" if not nearest_pnl["is_road"] else "não informada"
+                    "não aplicável ao modal" if not is_road else "não informada"
                 )
             ))
             st.write(f"**Carregamento total modelado:** {nearest_pnl['total_flow']:,.0f} t")

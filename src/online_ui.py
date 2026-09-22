@@ -14,11 +14,13 @@ from .config import PV_LOCATION
 from .ui_service import analyze_preliminary
 from .ocm_ui import add_ocm_layer
 from .characterization_ui import render_characterization
-from .pnl_routes import add_pnl_layer, load_pnl_window
+from .pnl_routes import add_pnl_layer, gtype_label, load_pnl_window
 
 
 @st.cache_data(show_spinner=False, ttl=86400)
-def cached_online_pnl(latitude: float, longitude: float, radius_km: float):
+def cached_online_pnl(latitude: float, longitude: float, radius_km: float,
+                      schema_version: str = "pnl-dictionary-v1"):
+    del schema_version
     return load_pnl_window(latitude, longitude, radius_km)
 
 
@@ -140,6 +142,8 @@ def render_online():
         st.error(f"Camada PNL indisponível: {pnl_error}")
     elif pnl_data:
         nearest = pnl_data["nearest"]
+        modal = nearest.get("modal") or gtype_label(nearest.get("gtype"))
+        is_road = nearest.get("is_road", nearest.get("gtype") == 1)
         st.subheader("Diagnóstico logístico PNL")
         a, b, c = st.columns(3)
         a.metric("Rota de carga mais próxima", f"{nearest['distance_km']:.2f} km")
@@ -147,13 +151,13 @@ def render_online():
         b.metric(
             "Saturação rodoviária máxima",
             f"{saturation * 100:.1f}%" if saturation is not None else (
-                "Não aplicável" if not nearest["is_road"] else "Não informada"
+                "Não aplicável" if not is_road else "Não informada"
             ),
         )
         c.metric("Trechos PNL no raio", pnl_data["segment_count"])
         st.write(
             f"**Segmento:** {nearest['segment_id']} · "
-            f"**Modal:** {nearest['modal']} (`GTYPE = {nearest['gtype']}`) · "
+            f"**Modal:** {modal} (`GTYPE = {nearest['gtype']}`) · "
             f"**Corredor:** {nearest['corridor']} · "
             f"**Carregamento total modelado:** {nearest['total_flow']:,.0f} t"
         )

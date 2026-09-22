@@ -10,6 +10,7 @@ Aplicação de pesquisa para análise locacional de eletropostos, avaliação pr
 - triagem preliminar por APIs públicas;
 - análise detalhada com BDGD local ou tratada em nuvem;
 - mapa da rede de média tensão, transformadores e subestações de distribuição;
+- camada PNL de rotas de transporte de cargas, fluxos, saturação trimestral e corredores;
 - estimativa temporal de capacidade residual;
 - identificação de períodos críticos e oportunidades de carregamento;
 - otimização econômica e de qualidade de atendimento;
@@ -20,7 +21,9 @@ As estimativas são instrumentos de triagem e pesquisa. Elas não substituem est
 
 ## Dados
 
-As bases BDGD não são armazenadas neste repositório devido ao volume. A aplicação pode consultar os pacotes tratados no Google Drive sob demanda. O modo local local continua disponível quando uma BDGD é instalada pelo usuário.
+As bases BDGD não são armazenadas neste repositório devido ao volume. A aplicação pode consultar os pacotes tratados no Google Drive sob demanda. O modo local continua disponível quando uma BDGD é instalada pelo usuário.
+
+A rede logística PNL também é obtida do Google Drive somente quando sua camada é ativada. O arquivo é mantido em cache temporário e as consultas usam recortes espaciais. Enquanto o dicionário e as unidades do estudo não estiverem documentados, os campos `T_TOTAL` e `GTYPE` são exibidos como atributos originais e não são convertidos automaticamente em veículos ou potência de recarga.
 
 ## Execução local
 
@@ -38,4 +41,3 @@ A chave do Open Charge Map deve ser fornecida pela variável de ambiente `OPENCH
 ## Implantação
 
 O ponto de entrada da interface é `app.py`. Para Streamlit Community Cloud, conecte este repositório, selecione a branch `main` e cadastre os segredos nas configurações da aplicação.
-

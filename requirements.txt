@@ -13,6 +13,7 @@ pyproj
 shapely
 pyarrow
 gdown>=5.2,<6
+py7zr>=0.22,<1
 streamlit
 streamlit-folium
 requests

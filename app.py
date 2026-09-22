@@ -20,6 +20,7 @@ from src.ocm_ui import add_ocm_layer
 from src.technical_ui import render_technical_panel
 from src.service_policy import describe_policy
 from src.cloud_bdgd import CLOUD_DATASETS, load_cloud_coverage, prepare_cloud_point
+from src.pnl_routes import add_pnl_layer, load_pnl_window
 from access_counter import register_access, render_access_footer
 
 
@@ -232,6 +233,11 @@ def cached_map(latitude: float, longitude: float, radius_km: float, source_path)
     )
 
 
+@st.cache_data(show_spinner=False, ttl=86400)
+def cached_pnl_window(latitude: float, longitude: float, radius_km: float):
+    return load_pnl_window(latitude, longitude, radius_km)
+
+
 try:
     with st.spinner("Preparando a área da BDGD carregada..."):
         coverage = cached_coverage(source_path)
@@ -301,6 +307,18 @@ with st.sidebar:
         station_radius = st.slider("Raio dos eletropostos (km)", 1, 25, 10)
         include_uncertain = st.checkbox("Incluir acesso condicionado ou não informado", value=False)
         st.caption("Fonte: Open Charge Map. Cache de 6 h; estado cadastral, não ocupação em tempo real.")
+    show_pnl = st.toggle(
+        "Exibir rotas de transporte de cargas (PNL)", value=False,
+        help="Camada logística independente da BDGD. O primeiro acesso baixa e prepara o pacote mantido no Google Drive.",
+    )
+    pnl_radius_km, pnl_display_mode = 15.0, "Saturação"
+    if show_pnl:
+        pnl_radius_km = st.slider("Raio das rotas PNL (km)", 5, 50, 15, 5)
+        pnl_display_mode = st.selectbox(
+            "Visualização das rotas PNL",
+            ["Saturação", "Fluxo total", "Corredores"],
+        )
+        st.caption("Diagnóstico logístico: não altera automaticamente a demanda do eletroposto.")
     threshold_kw = st.number_input("Limiar crítico (kW)", min_value=0.0, value=250.0, step=25.0)
     mode_label = st.selectbox("Horizonte da simulação", [f"Anual ({SCENARIO_ANNUAL['horizon_h']:.0f} h)", "Diário (24 h)"])
     st.caption(f"Recurso solar: {PV_SYSTEM['radiation_database']} · PVGIS 5.3 · ano {PV_SYSTEM['year']}. "
@@ -365,6 +383,14 @@ try:
     map_error = None
 except Exception as exc:
     map_data, map_error = None, str(exc)
+
+pnl_data, pnl_error = None, None
+if show_pnl:
+    try:
+        with st.spinner("Preparando a rede logística PNL; o primeiro acesso pode levar alguns minutos..."):
+            pnl_data = cached_pnl_window(round(lat, 7), round(lon, 7), float(pnl_radius_km))
+    except Exception as exc:
+        pnl_error = str(exc)
 
 st.markdown("""
 <div class="section-eyebrow">Etapa 1 · Diagnóstico locacional</div>
@@ -436,6 +462,8 @@ with map_col:
         substation_group.add_to(map_view)
     if show_stations:
         add_ocm_layer(map_view, lat, lon, station_radius, include_uncertain)
+    if pnl_data:
+        add_pnl_layer(map_view, pnl_data, pnl_display_mode)
     folium.LayerControl().add_to(map_view)
     event = st_folium(map_view, height=560, use_container_width=True,
                       key=f"network_map_{st.session_state.get('map_revision', 0)}",
@@ -498,6 +526,28 @@ with action_col:
                     f"{excluded} instalação(ões) da camada SUB sem alimentador CTMT associado "
                     "foram omitidas para não misturar consumidores AT ou instalações particulares."
                 )
+
+    if pnl_error:
+        st.error(f"Camada PNL indisponível: {pnl_error}")
+    elif pnl_data:
+        nearest_pnl = pnl_data["nearest"]
+        with st.expander("Diagnóstico logístico PNL", expanded=True):
+            st.metric("Distância à rota de carga mais próxima", f"{nearest_pnl['distance_km']:.2f} km")
+            st.write(f"**Segmento PNL:** {nearest_pnl['segment_id']}")
+            st.write(f"**Tipo cadastrado (GTYPE):** {nearest_pnl['gtype']}")
+            st.write(f"**Corredor:** {nearest_pnl['corridor']}")
+            saturation = nearest_pnl.get("max_saturation")
+            st.write("**Saturação máxima:** " + (
+                f"{saturation * 100:.1f}% · {nearest_pnl['saturation_label']}"
+                if saturation is not None else "não informada"
+            ))
+            st.write(f"**Fluxo total PNL:** {nearest_pnl['total_flow']:,.0f}")
+            st.caption(
+                f"{pnl_data['segment_count']} trechos no raio; "
+                f"{pnl_data['corridor_segment_count']} classificados como corredores; "
+                f"{pnl_data['high_saturation_count']} com saturação ≥80%."
+            )
+            st.warning(pnl_data["interpretation_warning"])
 
     if st.button("Analisar rede neste ponto", type="primary", use_container_width=True,
                  disabled=not inside_coverage):

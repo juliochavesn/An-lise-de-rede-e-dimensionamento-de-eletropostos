@@ -14,6 +14,12 @@ from .config import PV_LOCATION
 from .ui_service import analyze_preliminary
 from .ocm_ui import add_ocm_layer
 from .characterization_ui import render_characterization
+from .pnl_routes import add_pnl_layer, load_pnl_window
+
+
+@st.cache_data(show_spinner=False, ttl=86400)
+def cached_online_pnl(latitude: float, longitude: float, radius_km: float):
+    return load_pnl_window(latitude, longitude, radius_km)
 
 
 def render_online():
@@ -59,6 +65,15 @@ def render_online():
         if show_stations:
             station_radius = st.slider("Raio dos eletropostos (km)", 1, 25, 10)
             include_uncertain = st.checkbox("Incluir acesso condicionado ou não informado", value=False)
+        show_pnl = st.toggle("Exibir rotas de transporte de cargas (PNL)", value=False)
+        pnl_radius, pnl_mode = 15, "Saturação"
+        if show_pnl:
+            pnl_radius = st.slider("Raio das rotas PNL (km)", 5, 50, 15, 5, key="online_pnl_radius")
+            pnl_mode = st.selectbox(
+                "Visualização das rotas PNL", ["Saturação", "Fluxo total", "Corredores"],
+                key="online_pnl_mode",
+            )
+            st.caption("A camada orienta a triagem logística; não representa demanda elétrica calculada.")
 
     lat, lon = st.session_state.latitude, st.session_state.longitude
     signature = (lat, lon, radius, tariff_subgroup, tariff_date.isoformat())
@@ -100,6 +115,14 @@ def render_online():
                            style_function=lambda _: {"color": "#2563eb", "weight": 2}).add_to(view)
     if show_stations:
         add_ocm_layer(view, lat, lon, station_radius, include_uncertain)
+    pnl_data, pnl_error = None, None
+    if show_pnl:
+        try:
+            with st.spinner("Preparando a rede logística PNL; o primeiro acesso pode levar alguns minutos..."):
+                pnl_data = cached_online_pnl(round(lat, 7), round(lon, 7), float(pnl_radius))
+            add_pnl_layer(view, pnl_data, pnl_mode)
+        except Exception as exc:
+            pnl_error = str(exc)
     folium.LayerControl().add_to(view)
     event = st_folium(view, height=560, use_container_width=True,
                       key=f"online_map_{st.session_state.get('online_revision', 0)}", returned_objects=["last_clicked"])
@@ -109,6 +132,21 @@ def render_online():
             select(float(click["lat"]), float(click["lng"]))
             st.rerun()
     st.info("Capacidade disponível: não determinada pelas APIs integradas. Para calcular capacidade residual e simular, utilize o modo detalhado com a BDGD correspondente.")
+    if pnl_error:
+        st.error(f"Camada PNL indisponível: {pnl_error}")
+    elif pnl_data:
+        nearest = pnl_data["nearest"]
+        st.subheader("Diagnóstico logístico PNL")
+        a, b, c = st.columns(3)
+        a.metric("Rota de carga mais próxima", f"{nearest['distance_km']:.2f} km")
+        saturation = nearest.get("max_saturation")
+        b.metric("Saturação máxima", f"{saturation * 100:.1f}%" if saturation is not None else "Não informada")
+        c.metric("Trechos PNL no raio", pnl_data["segment_count"])
+        st.write(
+            f"**Segmento:** {nearest['segment_id']} · **GTYPE:** {nearest['gtype']} · "
+            f"**Corredor:** {nearest['corridor']} · **Fluxo total PNL:** {nearest['total_flow']:,.0f}"
+        )
+        st.warning(pnl_data["interpretation_warning"])
     if result:
         st.header("Caracterização do entorno — não é parecer de conexão")
         st.caption(f"Análise: {result['analyzed_at']} · raio: {radius} km · situação: {'parcial' if result['status'] == 'partial' else 'consultas concluídas'}")

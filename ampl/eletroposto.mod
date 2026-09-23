@@ -168,36 +168,104 @@ param served_energy_quality_floor_kwh >= 0 default 0;
 
 # Teto atualizado pelo Python após minimizar o backlog acumulado
 # entre as soluções que preservam o atendimento máximo.
+# A grandeza limitada é sum {t in T} backlog_kwh[t]. Apesar do
+# sufixo histórico "_kwh", a soma representa uma medida discreta
+# de energia em espera ao longo dos intervalos [kWh.intervalo].
 param backlog_quality_ceiling_kwh >= 0 default 1e30;
 
-param economic_service_mode binary default 0;
-param strict_service_targets binary default 0;
-param service_target >= 0, <= 1 default 0.98;
-param period_service_target >= 0, <= 1 default 0.95;
-param ev_unserved_cost >= 0 default 0;
-param ev_waiting_cost >= 0 default 0;
-set EA within T;
-set EV_ARCS within EA cross T;
-set QG;
-param quality_group {EA} default 0;
-var cohort_served {EV_ARCS} >= 0;
-var cohort_rejected {EA} >= 0;
-var cohort_pending {EA} >= 0;
-var global_target_shortfall_kwh >= 0;
-var period_target_shortfall_kwh {QG} >= 0;
-param target_shortfall_ceiling_kwh >= 0 default 1e30;
+# ============================================================
+# POLÍTICA ECONÔMICA E QUALIDADE DO ATENDIMENTO EV
+# ============================================================
 
+# Seleciona a formulação de atendimento:
+# 0 = referência lexicográfica de máximo atendimento;
+# 1 = minimização econômica com metas e coortes de chegada.
+param economic_service_mode binary default 0;       # [0/1]
+
+# Define se as metas global e por período são obrigatórias:
+# 0 = metas preferenciais; déficits fisicamente inevitáveis são medidos;
+# 1 = metas rígidas; qualquer déficit torna o caso inviável.
+param strict_service_targets binary default 0;      # [0/1]
+
+# Fração mínima da energia solicitada que deve ser atendida em
+# todo o horizonte no modo econômico (ex.: 0,98 = 98%).
+param service_target >= 0, <= 1 default 0.98;       # [fração]
+
+# Fração mínima de atendimento exigida separadamente em cada
+# grupo temporal QG (dia, mês ou outro agrupamento criado no Python).
+param period_service_target >= 0, <= 1 default 0.95; # [fração]
+
+# Penalidade econômica da energia de recarga definitivamente não
+# atendida: energia expirada mais backlog remanescente no horizonte.
+param ev_unserved_cost >= 0 default 0;              # [R$/kWh]
+
+# Penalidade econômica do tempo de espera energético. Multiplica
+# dt * sum backlog_kwh, resultando em kWh.h na função objetivo.
+param ev_waiting_cost >= 0 default 0;               # [R$/(kWh.h)]
+
+# Instantes de chegada das solicitações EV. Cada a em EA define
+# uma coorte de energia que entra no sistema no intervalo a.
+set EA within T;
+
+# Pares (a,t) permitidos para atendimento: a é a chegada e t é
+# um intervalo dentro da janela máxima de espera dessa coorte.
+set EV_ARCS within EA cross T;
+
+# Grupos usados para avaliar qualidade por período. Podem representar
+# dias, meses ou ficar vazios quando não há proteção adicional.
+set QG;
+
+# Associa cada coorte de chegada a ao seu grupo temporal g em QG.
+param quality_group {EA} default 0;
+
+# Energia da coorte que chegou em a e é efetivamente fornecida em t.
+var cohort_served {EV_ARCS} >= 0;                   # [kWh]
+
+# Energia da coorte a que completou a janela máxima de espera sem
+# ser atendida. Representa corte definitivo dentro do horizonte.
+var cohort_rejected {EA} >= 0;                      # [kWh]
+
+# Energia ainda pendente ao final do horizonte porque a janela de
+# espera da coorte ultrapassa last(T); não é rejeição antecipada.
+var cohort_pending {EA} >= 0;                       # [kWh]
+
+# Folga da meta de atendimento global. No modo preferencial registra
+# quanto faltou para a meta; no modo rígido é forçada a zero.
+var global_target_shortfall_kwh >= 0;               # [kWh]
+
+# Folga da meta de atendimento de cada grupo temporal g.
+var period_target_shortfall_kwh {QG} >= 0;          # [kWh]
+
+# Após minimizar as folgas, o Python fixa este teto para que a etapa
+# de custo não piore a melhor qualidade de atendimento encontrada.
+param target_shortfall_ceiling_kwh >= 0 default 1e30; # [kWh]
+
+# Conservação de energia por coorte: toda solicitação que chega
+# em a deve terminar atendida, rejeitada ou ainda pendente.
 subject to Cohort_Balance {a in EA}:
     sum {(aa,t) in EV_ARCS: aa=a} cohort_served[aa,t]
       + cohort_rejected[a] + cohort_pending[a] = request_kw[a]*dt;
+
+# Se a janela da coorte ultrapassa o horizonte, ela não pode ser
+# rejeitada antes de vencer; eventual saldo é classificado como pendente.
 subject to Cohort_No_Early_Rejection {a in EA: a+ev_max_delay_steps > last(T)}:
     cohort_rejected[a] = 0;
+
+# Se a janela termina dentro do horizonte, não pode sobrar energia
+# pendente: o saldo deve ter sido atendido ou rejeitado ao expirar.
 subject to Cohort_No_Late_Pending {a in EA: a+ev_max_delay_steps <= last(T)}:
     cohort_pending[a] = 0;
+
+# Limita, em cada grupo temporal, a energia não atendida à parcela
+# permitida por period_service_target. A folga mantém o problema
+# solucionável no modo preferencial e quantifica a insuficiência física.
 subject to Period_Service_Floor {g in QG}:
     sum {a in EA: quality_group[a]=g} (cohort_rejected[a]+cohort_pending[a])
       <= (1-period_service_target)*sum {a in EA: quality_group[a]=g} request_kw[a]*dt
          + period_target_shortfall_kwh[g];
+
+# No modo rígido, elimina todas as folgas periódicas; cada grupo
+# deve cumprir integralmente period_service_target.
 subject to Strict_Period_Targets {g in QG: strict_service_targets=1}:
     period_target_shortfall_kwh[g] = 0;
 
@@ -319,13 +387,23 @@ subject to Grid_Export_Limit {t in T}:
 subject to Charger_Limit {t in T}:
     p_served_kw[t] <= charger_max_kw;
 
+# No modo econômico, agrega no intervalo t toda energia despachada
+# para as diferentes coortes de chegada e a liga ao balanço geral EV.
 subject to Cohort_Dispatch {t in T: economic_service_mode=1}:
     e_served_kwh[t] = sum {(a,tt) in EV_ARCS: tt=t} cohort_served[a,tt];
+
+# Registra em t a energia cuja janela máxima de espera acabou nesse
+# intervalo sem atendimento. Essa energia deixa o backlog como expirada.
 subject to Cohort_Expiration {t in T: economic_service_mode=1}:
     expired_unserved_kwh[t] = sum {a in EA: a+ev_max_delay_steps=t} cohort_rejected[a];
+
+# Impõe a meta global no modo econômico. global_target_shortfall_kwh
+# mede o déficit quando a meta é preferencial e fisicamente inalcançável.
 subject to Economic_Service_Floor {dummy in 1..economic_service_mode}:
     sum {t in T} e_served_kwh[t] + global_target_shortfall_kwh
       >= service_target * sum {t in T} request_kw[t]*dt;
+
+# Em política rígida, proíbe folga na meta global.
 subject to Strict_Global_Target {dummy in 1..strict_service_targets}:
     global_target_shortfall_kwh = 0;
 
@@ -634,9 +712,13 @@ subject to Demand_Exceedance {m in M}:
 # FUNÇÃO OBJETIVO
 # ============================================================
 
+# Primeiro nível do modo econômico com metas preferenciais:
+# minimiza conjuntamente o déficit global e os déficits por período.
 minimize Service_Target_Shortfall:
     global_target_shortfall_kwh + sum {g in QG} period_target_shortfall_kwh[g];
 
+# Depois que o Python grava o menor déficit encontrado no teto,
+# impede que a minimização de custo sacrifique esse atendimento.
 subject to Preserve_Minimum_Target_Shortfall:
     global_target_shortfall_kwh + sum {g in QG} period_target_shortfall_kwh[g]
       <= target_shortfall_ceiling_kwh;

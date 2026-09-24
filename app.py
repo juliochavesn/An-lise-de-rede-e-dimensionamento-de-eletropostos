@@ -621,14 +621,26 @@ with action_col:
                     unsafe_allow_html=True,
                 )
                 demand_table = pd.DataFrame(scenario_table(freight_analysis))
+                compact_table = demand_table[[
+                    "Cenário", "Recargas/dia", "Energia/dia (kWh)", "Pico do perfil (kW)"
+                ]]
                 st.dataframe(
-                    demand_table,
+                    compact_table,
                     hide_index=True, use_container_width=True,
                     column_config={
                         column: st.column_config.NumberColumn(column, format="%.1f")
-                        for column in demand_table.columns if column != "Cenário"
+                        for column in compact_table.columns if column != "Cenário"
                     },
                 )
+                with st.expander("Ver todos os indicadores dos cenários"):
+                    st.dataframe(
+                        demand_table,
+                        hide_index=True, use_container_width=True,
+                        column_config={
+                            column: st.column_config.NumberColumn(column, format="%.1f")
+                            for column in demand_table.columns if column != "Cenário"
+                        },
+                    )
                 selected_freight = freight_analysis["scenarios"][freight_scenario]
                 profile_table = pd.DataFrame({
                     "Hora do dia (h)": list(range(24)),
@@ -663,7 +675,7 @@ with action_col:
                         gridColor="#dbe6f1", titleFontSize=13, labelFontSize=11,
                     )
                     .configure_title(color="#0b2340", fontSize=15, anchor="start")
-                    .configure_view(strokeColor="#dbe6f1")
+                    .configure_view(stroke="#dbe6f1")
                 )
                 st.altair_chart(profile_chart, use_container_width=True)
                 st.caption(

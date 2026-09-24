@@ -641,69 +641,6 @@ with action_col:
             st.warning(pnl_data["interpretation_warning"])
             if use_freight_demand and not is_road:
                 st.info("A conversão em recarga rodoviária não foi aplicada porque o segmento mais próximo não é rodoviário.")
-            elif freight_analysis:
-                st.markdown(
-                    '<div class="logistics-heading">Cenários de demanda logístico-elétrica</div>',
-                    unsafe_allow_html=True,
-                )
-                demand_table = pd.DataFrame(scenario_table(freight_analysis))
-                compact_table = demand_table[[
-                    "Cenário", "Recargas/dia", "Energia/dia (kWh)", "Pico do perfil (kW)"
-                ]]
-                st.dataframe(
-                    compact_table,
-                    hide_index=True, use_container_width=True,
-                    column_config={
-                        column: st.column_config.NumberColumn(column, format="%.1f")
-                        for column in compact_table.columns if column != "Cenário"
-                    },
-                )
-                with st.expander("Ver todos os indicadores dos cenários"):
-                    st.dataframe(
-                        demand_table,
-                        hide_index=True, use_container_width=True,
-                        column_config={
-                            column: st.column_config.NumberColumn(column, format="%.1f")
-                            for column in demand_table.columns if column != "Cenário"
-                        },
-                    )
-                selected_freight = freight_analysis["scenarios"][freight_scenario]
-                profile_table = pd.DataFrame({
-                    "Hora do dia (h)": list(range(24)),
-                    "Demanda de recarga (kW)": selected_freight["hourly_profile_kw"],
-                })
-                from matplotlib import pyplot as plt
-
-                figure, axis = plt.subplots(figsize=(7.2, 4.6), facecolor="#ffffff")
-                axis.set_facecolor("#ffffff")
-                axis.plot(
-                    profile_table["Hora do dia (h)"],
-                    profile_table["Demanda de recarga (kW)"],
-                    color="#0b63ce", linewidth=2.8, marker="o", markersize=4.5,
-                )
-                axis.set_title(
-                    f"Perfil horário de recarga — cenário {freight_scenario}",
-                    color="#0b2340", fontsize=13, fontweight="bold", loc="left", pad=12,
-                )
-                axis.set_xlabel("Hora do dia (h)", color="#0b2340", fontsize=11, fontweight="bold")
-                axis.set_ylabel("Demanda de recarga (kW)", color="#0b2340", fontsize=11, fontweight="bold")
-                axis.set_xlim(0, 23)
-                axis.set_ylim(bottom=0)
-                axis.set_xticks(list(range(0, 24, 2)))
-                axis.tick_params(axis="both", colors="#243b53", labelsize=9)
-                axis.grid(True, color="#cbd5e1", linewidth=.8, alpha=.9)
-                for spine in axis.spines.values():
-                    spine.set_color("#52657a")
-                figure.tight_layout()
-                st.pyplot(figure, use_container_width=True)
-                plt.close(figure)
-                st.caption(
-                    f"{freight_scenario}: {selected_freight['charging_events_per_day']:.1f} recargas/dia, "
-                    f"{selected_freight['daily_energy_kwh']:,.1f} kWh/dia e pico representativo de "
-                    f"{selected_freight['profile_peak_kw']:,.1f} kW. O fator da demanda de recarga "
-                    "da simulação é aplicado adicionalmente a esta curva."
-                )
-                st.warning(freight_analysis["scope_warning"])
 
     if st.button("Analisar rede neste ponto", type="primary", use_container_width=True,
                  disabled=not inside_coverage):
@@ -752,6 +689,99 @@ with action_col:
                         st.session_state.demand_comparison_history = history[-10:]
             except Exception as exc:
                 st.error(str(exc))
+
+if freight_analysis:
+    selected_freight = freight_analysis["scenarios"][freight_scenario]
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(
+        '<div class="section-eyebrow">Integração PNL · Demanda de recarga</div>'
+        '<div class="section-title">Cenários de demanda logístico-elétrica</div>'
+        '<div class="section-copy">Conversão paramétrica do carregamento rodoviário em viagens, recargas e potência horária.</div>',
+        unsafe_allow_html=True,
+    )
+    metric_cols = st.columns(5)
+    metric_cols[0].metric("Cenário aplicado", freight_scenario)
+    metric_cols[1].metric("Caminhões físicos/dia", f"{selected_freight['physical_trips_per_day']:,.1f}")
+    metric_cols[2].metric("Recargas capturadas/dia", f"{selected_freight['charging_events_per_day']:,.1f}")
+    metric_cols[3].metric("Energia de recarga/dia", f"{selected_freight['daily_energy_kwh']:,.1f} kWh")
+    metric_cols[4].metric("Pico representativo", f"{selected_freight['profile_peak_kw']:,.1f} kW")
+
+    details_col, chart_col = st.columns([1, 1.8], gap="large")
+    demand_table = pd.DataFrame(scenario_table(freight_analysis))
+    compact_table = demand_table[[
+        "Cenário", "Recargas/dia", "Energia/dia (kWh)", "Pico do perfil (kW)"
+    ]]
+    with details_col:
+        st.markdown('<div class="logistics-heading">Comparação P10–P90</div>', unsafe_allow_html=True)
+        st.dataframe(
+            compact_table,
+            hide_index=True, use_container_width=True,
+            column_config={
+                column: st.column_config.NumberColumn(column, format="%.1f")
+                for column in compact_table.columns if column != "Cenário"
+            },
+        )
+        with st.expander("Ver todos os indicadores dos cenários"):
+            st.dataframe(
+                demand_table,
+                hide_index=True, use_container_width=True,
+                column_config={
+                    column: st.column_config.NumberColumn(column, format="%.1f")
+                    for column in demand_table.columns if column != "Cenário"
+                },
+            )
+        st.caption(
+            "P10 e P90 são cenários paramétricos em torno das hipóteses centrais; "
+            "não são percentis estatísticos calibrados com contagens de campo."
+        )
+        st.warning(freight_analysis["scope_warning"])
+
+    with chart_col:
+        profile_table = pd.DataFrame({
+            "Hora do dia (h)": list(range(24)),
+            "Demanda de recarga (kW)": selected_freight["hourly_profile_kw"],
+        })
+        from matplotlib import pyplot as plt
+
+        figure, axis = plt.subplots(figsize=(11.5, 5.0), facecolor="#ffffff")
+        axis.set_facecolor("#ffffff")
+        axis.fill_between(
+            profile_table["Hora do dia (h)"], 0,
+            profile_table["Demanda de recarga (kW)"],
+            color="#bfdbfe", alpha=.55,
+        )
+        axis.plot(
+            profile_table["Hora do dia (h)"],
+            profile_table["Demanda de recarga (kW)"],
+            color="#0b63ce", linewidth=3.0, marker="o", markersize=5,
+        )
+        axis.axhline(
+            selected_freight["mean_power_kw"], color="#0f766e", linewidth=1.8,
+            linestyle="--", label=f"Potência média: {selected_freight['mean_power_kw']:,.1f} kW",
+        )
+        axis.set_title(
+            f"Perfil horário de recarga — cenário {freight_scenario}",
+            color="#0b2340", fontsize=15, fontweight="bold", loc="left", pad=12,
+        )
+        axis.set_xlabel("Hora do dia (h)", color="#0b2340", fontsize=12, fontweight="bold")
+        axis.set_ylabel("Demanda de recarga (kW)", color="#0b2340", fontsize=12, fontweight="bold")
+        axis.set_xlim(0, 23)
+        axis.set_ylim(bottom=0)
+        axis.set_xticks(list(range(0, 24, 2)))
+        axis.tick_params(axis="both", colors="#243b53", labelsize=10)
+        axis.grid(True, color="#cbd5e1", linewidth=.8, alpha=.9)
+        axis.legend(loc="upper right", frameon=True, facecolor="#ffffff", edgecolor="#94a3b8")
+        for spine in axis.spines.values():
+            spine.set_color("#52657a")
+        figure.tight_layout()
+        st.pyplot(figure, use_container_width=True)
+        plt.close(figure)
+        st.caption(
+            f"{freight_scenario}: {selected_freight['charging_events_per_day']:.1f} recargas/dia, "
+            f"{selected_freight['daily_energy_kwh']:,.1f} kWh/dia e pico representativo de "
+            f"{selected_freight['profile_peak_kw']:,.1f} kW. O fator da demanda de recarga "
+            "da simulação é aplicado adicionalmente a esta curva."
+        )
 
 if "network_result" in st.session_state:
     result = st.session_state.network_result

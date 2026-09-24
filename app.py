@@ -6,7 +6,6 @@ import json
 import math
 from pathlib import Path
 
-import altair as alt
 import folium
 import pandas as pd
 import streamlit as st
@@ -514,6 +513,33 @@ with map_col:
         add_ocm_layer(map_view, lat, lon, station_radius, include_uncertain)
     if pnl_data:
         add_pnl_layer(map_view, pnl_data, pnl_display_mode)
+    map_view.get_root().header.add_child(folium.Element("""
+    <style>
+      .leaflet-control-layers,
+      .leaflet-control-layers-expanded {
+        background: #ffffff !important;
+        color: #0b2340 !important;
+        border: 2px solid #52657a !important;
+        border-radius: 6px !important;
+        box-shadow: 0 2px 8px rgba(7,27,51,.28) !important;
+      }
+      .leaflet-control-layers label,
+      .leaflet-control-layers span {
+        color: #0b2340 !important;
+        font-weight: 600 !important;
+      }
+      .leaflet-control-layers-toggle {
+        background-color: #ffffff !important;
+        opacity: 1 !important;
+      }
+      .leaflet-bar a,
+      .leaflet-bar a:hover {
+        background-color: #ffffff !important;
+        color: #0b2340 !important;
+        border-color: #94a3b8 !important;
+      }
+    </style>
+    """))
     folium.LayerControl().add_to(map_view)
     event = st_folium(map_view, height=560, use_container_width=True,
                       key=f"network_map_{st.session_state.get('map_revision', 0)}",
@@ -646,40 +672,31 @@ with action_col:
                     "Hora do dia (h)": list(range(24)),
                     "Demanda de recarga (kW)": selected_freight["hourly_profile_kw"],
                 })
-                profile_chart = (
-                    alt.Chart(profile_table)
-                    .mark_line(point=True, strokeWidth=3, color="#0b63ce")
-                    .encode(
-                        x=alt.X(
-                            "Hora do dia (h):Q",
-                            title="Hora do dia (h)",
-                            scale=alt.Scale(domain=[0, 23]),
-                            axis=alt.Axis(values=list(range(0, 24, 2))),
-                        ),
-                        y=alt.Y(
-                            "Demanda de recarga (kW):Q",
-                            title="Demanda de recarga (kW)",
-                            scale=alt.Scale(zero=True),
-                        ),
-                        tooltip=[
-                            alt.Tooltip("Hora do dia (h):Q", title="Hora", format=".0f"),
-                            alt.Tooltip("Demanda de recarga (kW):Q", title="Demanda", format=",.1f"),
-                        ],
-                    )
-                    .properties(
-                        title=f"Perfil horário de recarga — cenário {freight_scenario}",
-                        height=320,
-                    )
-                    .configure_axis(
-                        labelColor="#243b53", titleColor="#0b2340",
-                        gridColor="#dbe6f1", titleFontSize=13, labelFontSize=11,
-                        domainColor="#52657a", tickColor="#52657a",
-                    )
-                    .configure_title(color="#0b2340", fontSize=15, anchor="start")
-                    .configure_view(fill="#ffffff", stroke="#dbe6f1")
-                    .configure(background="#ffffff")
+                from matplotlib import pyplot as plt
+
+                figure, axis = plt.subplots(figsize=(7.2, 4.6), facecolor="#ffffff")
+                axis.set_facecolor("#ffffff")
+                axis.plot(
+                    profile_table["Hora do dia (h)"],
+                    profile_table["Demanda de recarga (kW)"],
+                    color="#0b63ce", linewidth=2.8, marker="o", markersize=4.5,
                 )
-                st.altair_chart(profile_chart, use_container_width=True, theme=None)
+                axis.set_title(
+                    f"Perfil horário de recarga — cenário {freight_scenario}",
+                    color="#0b2340", fontsize=13, fontweight="bold", loc="left", pad=12,
+                )
+                axis.set_xlabel("Hora do dia (h)", color="#0b2340", fontsize=11, fontweight="bold")
+                axis.set_ylabel("Demanda de recarga (kW)", color="#0b2340", fontsize=11, fontweight="bold")
+                axis.set_xlim(0, 23)
+                axis.set_ylim(bottom=0)
+                axis.set_xticks(list(range(0, 24, 2)))
+                axis.tick_params(axis="both", colors="#243b53", labelsize=9)
+                axis.grid(True, color="#cbd5e1", linewidth=.8, alpha=.9)
+                for spine in axis.spines.values():
+                    spine.set_color("#52657a")
+                figure.tight_layout()
+                st.pyplot(figure, use_container_width=True)
+                plt.close(figure)
                 st.caption(
                     f"{freight_scenario}: {selected_freight['charging_events_per_day']:.1f} recargas/dia, "
                     f"{selected_freight['daily_energy_kwh']:,.1f} kWh/dia e pico representativo de "

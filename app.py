@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+from html import escape
 from pathlib import Path
 
 import folium
@@ -84,6 +85,35 @@ st.markdown("""
     .logistics-copy {
         color:#334e68 !important;
     }
+    .pnl-metric-grid {
+        display:grid;
+        grid-template-columns:repeat(6,minmax(0,1fr));
+        gap:.7rem;
+        margin:.45rem 0 .7rem;
+    }
+    .pnl-metric-card {
+        min-width:0;
+        padding:.8rem .78rem;
+        background:rgba(255,255,255,.94);
+        border:1px solid var(--line);
+        border-radius:14px;
+        box-shadow:0 6px 18px rgba(25,55,88,.06);
+    }
+    .pnl-metric-label {
+        color:#52657a !important;
+        font-size:clamp(.68rem,.78vw,.78rem);
+        font-weight:700;
+        line-height:1.18;
+        min-height:2.15em;
+        margin-bottom:.3rem;
+    }
+    .pnl-metric-value {
+        color:#071b33 !important;
+        font-size:clamp(.9rem,1.05vw,1.12rem);
+        font-weight:750;
+        line-height:1.15;
+        overflow-wrap:anywhere;
+    }
     [data-testid="stExpander"] details,
     [data-testid="stExpander"] summary,
     [data-testid="stExpander"] [data-testid="stExpanderDetails"] {
@@ -125,6 +155,11 @@ st.markdown("""
         iframe[title="streamlit_folium.st_folium"] { height:430px !important; }
         .footer-card { flex-direction:column; }
         [data-testid="stDataFrame"] { max-width:calc(100vw - 1.7rem); overflow-x:auto; }
+        .pnl-metric-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+        .pnl-metric-label { min-height:auto; }
+    }
+    @media (min-width:769px) and (max-width:1180px) {
+        .pnl-metric-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
     }
 </style>
 <div class="hero">
@@ -699,13 +734,22 @@ elif pnl_data:
         '<div class="section-copy">Caracterização horizontal da rota de carga mais próxima e do recorte territorial analisado.</div>',
         unsafe_allow_html=True,
     )
-    pnl_metrics = st.columns(6)
-    pnl_metrics[0].metric("Distância à rota", f"{nearest_pnl['distance_km']:.2f} km")
-    pnl_metrics[1].metric("Modal", modal)
-    pnl_metrics[2].metric("Corredor", nearest_pnl["corridor"])
-    pnl_metrics[3].metric("Carregamento modelado", f"{nearest_pnl['total_flow']:,.0f} t")
-    pnl_metrics[4].metric("Saturação máxima", saturation_display)
-    pnl_metrics[5].metric("Carga predominante", nearest_pnl.get("main_load_group") or "Não informada")
+    pnl_metric_values = [
+        ("Distância à rota", f"{nearest_pnl['distance_km']:.2f} km"),
+        ("Modal", modal),
+        ("Corredor", nearest_pnl["corridor"]),
+        ("Carregamento modelado", f"{nearest_pnl['total_flow']:,.0f} t".replace(",", ".")),
+        ("Saturação máxima", saturation_display),
+        ("Carga predominante", nearest_pnl.get("main_load_group") or "Não informada"),
+    ]
+    pnl_cards = "".join(
+        '<div class="pnl-metric-card">'
+        f'<div class="pnl-metric-label">{escape(str(label))}</div>'
+        f'<div class="pnl-metric-value">{escape(str(value))}</div>'
+        '</div>'
+        for label, value in pnl_metric_values
+    )
+    st.markdown(f'<div class="pnl-metric-grid">{pnl_cards}</div>', unsafe_allow_html=True)
     st.caption(
         f"Segmento PNL {nearest_pnl['segment_id']} · GTYPE = {nearest_pnl['gtype']} · "
         f"{nearest_pnl['saturation_label']}"

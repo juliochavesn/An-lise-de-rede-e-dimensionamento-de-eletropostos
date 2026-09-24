@@ -361,50 +361,9 @@ with st.sidebar:
                 )
                 st.caption("P10 e P90 variam todas as hipóteses em torno destes valores; P50 usa os valores informados.")
     threshold_kw = st.number_input("Limiar crítico (kW)", min_value=0.0, value=250.0, step=25.0)
-    mode_label = st.selectbox("Horizonte da simulação", [f"Anual ({SCENARIO_ANNUAL['horizon_h']:.0f} h)", "Diário (24 h)"])
-    st.caption(f"Recurso solar: {PV_SYSTEM['radiation_database']} · PVGIS 5.3 · ano {PV_SYSTEM['year']}. "
-               "Ano meteorológico histórico, não previsão nem data-base da BDGD.")
-    mode = "annual" if mode_label.startswith("Anual") else "daily"
-    limit_contract = st.checkbox("Limitar demanda contratada", value=False,
-        help="Desmarcado: somente limites BDGD. Marcado: mantém a BDGD e acrescenta um teto comercial.")
-    contract_cap_kw = None
-    if limit_contract:
-        contract_cap_kw = st.number_input("Teto da demanda contratada (kW)",
-            min_value=0.1, value=100.0, step=10.0)
-        st.caption("É um máximo, não um contrato fixo. O otimizador pode contratar menos. "
-                   "A capacidade residual da rede continua sendo respeitada em cada horário.")
-    else:
-        st.caption("Demanda contratada livre de teto do usuário, sujeita aos limites BDGD.")
-    service_label = st.selectbox("Objetivo da otimização", ["Econômico com meta de atendimento", "Máximo atendimento (referência)"])
-    policy = {"mode": "economic" if service_label.startswith("Econômico") else "maximum"}
-    if policy["mode"] == "economic":
-        policy["target"] = st.number_input("Meta mínima no horizonte (%)", 0.0, 100.0, 98.0, 1.0) / 100
-        policy["strict"] = st.checkbox("Exigir a meta como restrição rígida", value=False,
-            help="Desmarcado: entrega o melhor atendimento possível se a rede não alcançar a meta. Marcado: o caso é inviável se a meta não puder ser cumprida.")
-        protection = st.selectbox("Proteção de atendimento por período", ["Mensal", "Diária", "Sem proteção adicional"])
-        policy["period"] = {"Mensal": "monthly", "Diária": "daily", "Sem proteção adicional": "none"}[protection]
-        if policy["period"] != "none":
-            policy["period_target"] = st.number_input("Meta mínima por período (%)", 0.0, 100.0, 95.0, 1.0) / 100
-        policy["unserved_penalty"] = st.number_input("Penalidade por energia não atendida (R$/kWh)", 0.0, value=0.0, step=0.1)
-        policy["waiting_penalty"] = st.number_input("Penalidade de espera energética (R$/kWh·h)", 0.0, value=0.0, step=0.01)
-        st.caption("Com meta preferencial, primeiro minimiza o déficit de atendimento e depois o custo; pode atender mais que a meta. "
-                   "Se a rede não alcançar a meta, retorna a melhor solução e quantifica o corte. A opção rígida declara o caso inviável.")
-    else:
-        st.caption("Referência anterior: máximo atendimento, mínima espera e depois mínimo custo.")
-    sweep = False
-    if policy["mode"] == "economic":
-        sweep = st.checkbox("Comparar metas 95%, 98%, 99% e 100%", value=False)
-        if sweep:
-            st.caption("Executará quatro otimizações com o mesmo teto e proteção temporal; pode levar mais tempo. No modo preferencial, déficit físico será quantificado; no rígido, metas impossíveis serão identificadas como inviáveis.")
-    config_labels = {"SMART": "Recarga inteligente", "SMART_PV": "Recarga + solar",
-                     "SMART_BESS": "Recarga + bateria", "SMART_PV_BESS": "Recarga + solar + bateria"}
-    configs = st.multiselect(
-        "Configurações", ["SMART", "SMART_PV", "SMART_BESS", "SMART_PV_BESS"],
-        default=["SMART_PV_BESS"],
-        format_func=lambda value: config_labels[value],
-    )
-    demand_scale = st.slider("Fator da demanda de recarga", 0.25, 3.0, 1.0, 0.05)
-    local_scale = st.slider("Fator da carga local", 0.0, 3.0, 1.0, 0.05)
+
+config_labels = {"SMART": "Recarga inteligente", "SMART_PV": "Recarga + solar",
+                 "SMART_BESS": "Recarga + bateria", "SMART_PV_BESS": "Recarga + solar + bateria"}
 
 lat, lon = st.session_state.latitude, st.session_state.longitude
 inside_coverage = coverage is not None and point_is_covered(lat, lon, coverage)
@@ -556,6 +515,77 @@ with map_col:
                     "O ponto clicado está fora da área coberta pela BDGD e não foi selecionado."
                 )
             st.rerun()
+
+    with st.expander("Configuração da simulação", expanded=True):
+        horizon_col, service_col, technology_col = st.columns(3, gap="large")
+        with horizon_col:
+            st.markdown("**Horizonte e conexão**")
+            mode_label = st.selectbox(
+                "Horizonte da simulação",
+                [f"Anual ({SCENARIO_ANNUAL['horizon_h']:.0f} h)", "Diário (24 h)"],
+            )
+            mode = "annual" if mode_label.startswith("Anual") else "daily"
+            limit_contract = st.checkbox(
+                "Limitar demanda contratada", value=False,
+                help="Mantém os limites BDGD e acrescenta um teto comercial.",
+            )
+            contract_cap_kw = None
+            if limit_contract:
+                contract_cap_kw = st.number_input(
+                    "Teto da demanda contratada (kW)", min_value=0.1, value=100.0, step=10.0,
+                )
+                st.caption("O otimizador pode contratar menos; a capacidade residual continua sendo respeitada.")
+            else:
+                st.caption("Sem teto do usuário; permanecem os limites da BDGD.")
+            st.caption(
+                f"Solar: {PV_SYSTEM['radiation_database']} · PVGIS 5.3 · ano meteorológico {PV_SYSTEM['year']}."
+            )
+
+        with service_col:
+            st.markdown("**Qualidade do atendimento**")
+            service_label = st.selectbox(
+                "Objetivo da otimização",
+                ["Econômico com meta de atendimento", "Máximo atendimento (referência)"],
+            )
+            policy = {"mode": "economic" if service_label.startswith("Econômico") else "maximum"}
+            if policy["mode"] == "economic":
+                policy["target"] = st.number_input(
+                    "Meta mínima no horizonte (%)", 0.0, 100.0, 98.0, 1.0,
+                ) / 100
+                policy["strict"] = st.checkbox(
+                    "Exigir meta como restrição rígida", value=False,
+                    help="Marcado: o caso é inviável se a meta não puder ser cumprida.",
+                )
+                protection = st.selectbox(
+                    "Proteção por período", ["Mensal", "Diária", "Sem proteção adicional"],
+                )
+                policy["period"] = {
+                    "Mensal": "monthly", "Diária": "daily", "Sem proteção adicional": "none"
+                }[protection]
+                if policy["period"] != "none":
+                    policy["period_target"] = st.number_input(
+                        "Meta mínima por período (%)", 0.0, 100.0, 95.0, 1.0,
+                    ) / 100
+            else:
+                st.caption("Prioriza atendimento máximo, espera mínima e, por fim, custo mínimo.")
+
+        with technology_col:
+            st.markdown("**Tecnologias e sensibilidade**")
+            configs = st.multiselect(
+                "Configurações", ["SMART", "SMART_PV", "SMART_BESS", "SMART_PV_BESS"],
+                default=["SMART_PV_BESS"], format_func=lambda value: config_labels[value],
+            )
+            demand_scale = st.slider("Fator da demanda de recarga", 0.25, 3.0, 1.0, 0.05)
+            local_scale = st.slider("Fator da carga local", 0.0, 3.0, 1.0, 0.05)
+            sweep = False
+            if policy["mode"] == "economic":
+                policy["unserved_penalty"] = st.number_input(
+                    "Penalidade por energia não atendida (R$/kWh)", 0.0, value=0.0, step=0.1,
+                )
+                policy["waiting_penalty"] = st.number_input(
+                    "Penalidade de espera (R$/kWh·h)", 0.0, value=0.0, step=0.01,
+                )
+                sweep = st.checkbox("Comparar metas 95%, 98%, 99% e 100%", value=False)
 
 with action_col:
     if cloud_point:

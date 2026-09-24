@@ -21,6 +21,7 @@ from src.technical_ui import render_technical_panel
 from src.service_policy import describe_policy
 from src.cloud_bdgd import CLOUD_DATASETS, load_cloud_coverage, prepare_cloud_point
 from src.pnl_routes import add_pnl_layer, gtype_label, load_pnl_window
+from src.freight_energy import FreightAssumptions, estimate_freight_charging, scenario_table
 from access_counter import register_access, render_access_footer
 
 
@@ -314,6 +315,9 @@ with st.sidebar:
         help="Camada logística independente da BDGD. O primeiro acesso baixa e prepara o pacote mantido no Google Drive.",
     )
     pnl_radius_km, pnl_display_mode = 15.0, "Saturação"
+    use_freight_demand = False
+    freight_scenario = "P50"
+    freight_assumptions = FreightAssumptions()
     if show_pnl:
         pnl_radius_km = st.slider("Raio das rotas PNL (km)", 5, 50, 15, 5)
         pnl_display_mode = st.selectbox(
@@ -324,6 +328,28 @@ with st.sidebar:
             "PNL 2050: carregamentos modelados em toneladas. A saturação trimestral "
             "se aplica apenas aos links rodoviários."
         )
+        use_freight_demand = st.toggle(
+            "Converter fluxo PNL em demanda de recarga", value=False,
+            help="Ativa cenários auditáveis; hipóteses de frota e recarga não são dados oficiais do PNL.",
+        )
+        if use_freight_demand:
+            freight_scenario = st.selectbox("Cenário logístico aplicado", ["P10", "P50", "P90"], index=1)
+            with st.expander("Hipóteses centrais da conversão"):
+                payload_t = st.number_input("Carga útil média (t/viagem)", 1.0, 100.0, 30.0, 1.0)
+                empty_ratio = st.number_input("Retornos vazios por viagem carregada", 0.0, 2.0, 0.35, 0.05)
+                electric_share = st.number_input("Participação elétrica (%)", 0.0, 100.0, 15.0, 1.0) / 100
+                capture_share = st.number_input("Captura pelo eletroposto (%)", 0.0, 100.0, 20.0, 1.0) / 100
+                energy_stop = st.number_input("Energia por parada (kWh)", 1.0, 1500.0, 250.0, 10.0)
+                operating_days = st.number_input("Dias operacionais por ano", 1, 366, 365, 1)
+                freight_assumptions = FreightAssumptions(
+                    payload_t=payload_t,
+                    empty_returns_per_loaded_trip=empty_ratio,
+                    electric_share=electric_share,
+                    station_capture_share=capture_share,
+                    energy_per_stop_kwh=energy_stop,
+                    operating_days_per_year=int(operating_days),
+                )
+                st.caption("P10 e P90 variam todas as hipóteses em torno destes valores; P50 usa os valores informados.")
     threshold_kw = st.number_input("Limiar crítico (kW)", min_value=0.0, value=250.0, step=25.0)
     mode_label = st.selectbox("Horizonte da simulação", [f"Anual ({SCENARIO_ANNUAL['horizon_h']:.0f} h)", "Diário (24 h)"])
     st.caption(f"Recurso solar: {PV_SYSTEM['radiation_database']} · PVGIS 5.3 · ano {PV_SYSTEM['year']}. "
@@ -396,6 +422,14 @@ if show_pnl:
             pnl_data = cached_pnl_window(round(lat, 7), round(lon, 7), float(pnl_radius_km))
     except Exception as exc:
         pnl_error = str(exc)
+
+freight_analysis = None
+if pnl_data and use_freight_demand:
+    nearest_route = pnl_data["nearest"]
+    if nearest_route.get("is_road"):
+        freight_analysis = estimate_freight_charging(
+            nearest_route["total_flow"], freight_assumptions
+        )
 
 st.markdown("""
 <div class="section-eyebrow">Etapa 1 · Diagnóstico locacional</div>
@@ -568,6 +602,28 @@ with action_col:
                 f"{pnl_data['high_saturation_count']} links rodoviários com saturação ≥80%."
             )
             st.warning(pnl_data["interpretation_warning"])
+            if use_freight_demand and not is_road:
+                st.info("A conversão em recarga rodoviária não foi aplicada porque o segmento mais próximo não é rodoviário.")
+            elif freight_analysis:
+                st.subheader("Cenários de demanda logístico-elétrica")
+                demand_table = pd.DataFrame(scenario_table(freight_analysis))
+                st.dataframe(
+                    demand_table.style.format({column: "{:,.1f}" for column in demand_table.columns if column != "Cenário"}),
+                    hide_index=True, use_container_width=True,
+                )
+                selected_freight = freight_analysis["scenarios"][freight_scenario]
+                profile_table = pd.DataFrame({
+                    "Hora": list(range(24)),
+                    "Demanda de recarga (kW)": selected_freight["hourly_profile_kw"],
+                }).set_index("Hora")
+                st.line_chart(profile_table)
+                st.caption(
+                    f"{freight_scenario}: {selected_freight['charging_events_per_day']:.1f} recargas/dia, "
+                    f"{selected_freight['daily_energy_kwh']:,.1f} kWh/dia e pico representativo de "
+                    f"{selected_freight['profile_peak_kw']:,.1f} kW. O fator da demanda de recarga "
+                    "da simulação é aplicado adicionalmente a esta curva."
+                )
+                st.warning(freight_analysis["scope_warning"])
 
     if st.button("Analisar rede neste ponto", type="primary", use_container_width=True,
                  disabled=not inside_coverage):
@@ -593,10 +649,23 @@ with action_col:
                 else:
                     policies = [dict(policy, target=x) for x in (.95, .98, .99, 1.0)] if sweep else [policy]
                     for current_policy in policies:
+                        logistics_kwargs = {}
+                        if freight_analysis:
+                            logistics_kwargs = {
+                                "logistics_profile_kw": freight_analysis["scenarios"][freight_scenario]["hourly_profile_kw"],
+                                "logistics_context": {
+                                    "pnl_segment_id": pnl_data["nearest"]["segment_id"],
+                                    "pnl_annual_tonnes": pnl_data["nearest"]["total_flow"],
+                                    "scenario": freight_scenario,
+                                    "analysis": freight_analysis["scenarios"][freight_scenario],
+                                    "central_assumptions": freight_analysis["central_assumptions"],
+                                },
+                            }
                         st.session_state.simulation_result = simulate_point(
                             lat, lon, mode, configs, demand_scale, local_scale, threshold_kw, network_config,
                             contracted_demand_cap_kw=contract_cap_kw,
                             service_policy=current_policy,
+                            **logistics_kwargs,
                         )
                         history = st.session_state.get("demand_comparison_history", [])
                         history.append(st.session_state.simulation_result)
@@ -626,6 +695,28 @@ if "network_result" in st.session_state:
     m3.metric("Capacidade residual máxima", f"{result['maximum_kw']:,.1f} kW" if valid_network else "Indisponível")
     m4.metric("Intervalos críticos", critical.get("critical_interval_count", "—"))
     st.info("Triagem baseada na BDGD pública; não substitui estudo de acesso nem parecer da concessionária.")
+    if valid_network and freight_analysis:
+        selected_freight = freight_analysis["scenarios"][freight_scenario]
+        logistics_peak = selected_freight["profile_peak_kw"] * demand_scale
+        limiting_residual = float(result["minimum_kw"])
+        deficit_kw = max(0.0, logistics_peak - limiting_residual)
+        st.subheader("Compatibilidade preliminar entre fluxo logístico e rede")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Cenário", freight_scenario)
+        c2.metric("Pico de recarga estimado", f"{logistics_peak:,.1f} kW")
+        c3.metric("Residual mínimo BDGD", f"{limiting_residual:,.1f} kW")
+        c4.metric("Déficit instantâneo indicativo", f"{deficit_kw:,.1f} kW")
+        if deficit_kw > 0:
+            st.warning(
+                "O pico representativo supera o menor residual estimado. Isso não torna o "
+                "projeto automaticamente inviável: a otimização testará deslocamento da "
+                "recarga, atendimento parcial, BESS, solar e eventual reforço."
+            )
+        else:
+            st.success(
+                "Na comparação conservadora de pico contra residual mínimo, a rede apresenta "
+                "margem. A conclusão depende ainda da simulação horária completa."
+            )
     output = Path(result["output_dir"])
     plot = output / "grid_capacity_24h_analysis.png"
     left, right = st.columns([1.5, 1])

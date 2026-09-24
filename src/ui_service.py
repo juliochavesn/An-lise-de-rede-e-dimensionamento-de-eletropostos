@@ -93,7 +93,8 @@ def analyze_point(latitude: float, longitude: float, threshold_kw: float, networ
 def simulate_point(latitude: float, longitude: float, mode: str,
                    configs: list[str], demand_scale: float,
                    local_scale: float, threshold_kw: float, network_config=None,
-                   contracted_demand_cap_kw=None, service_policy=None) -> dict:
+                   contracted_demand_cap_kw=None, service_policy=None,
+                   logistics_profile_kw=None, logistics_context=None) -> dict:
     policy = normalize_policy(service_policy)
     cap = None if contracted_demand_cap_kw is None else float(contracted_demand_cap_kw)
     if cap is not None and (not math.isfinite(cap) or cap <= 0
@@ -118,12 +119,19 @@ def simulate_point(latitude: float, longitude: float, mode: str,
         "EV_CRITICAL_CAPACITY_KW": str(threshold_kw),
     })
     env["EV_BDGD_PATH"] = str((network_config or GRID_NETWORK)["bdgd_path"])
+    if logistics_profile_kw is not None:
+        profile = [float(value) * float(demand_scale) for value in logistics_profile_kw]
+        if len(profile) != 24 or any(not math.isfinite(value) or value < 0 for value in profile):
+            raise ValueError("O perfil logístico deve conter 24 potências horárias válidas.")
+        env["EV_REQUEST_PROFILE_24H"] = json.dumps(profile)
     inputs = {"latitude": latitude, "longitude": longitude, "mode": mode,
               "configs": sorted(configs), "demand_scale": demand_scale,
               "local_scale": local_scale, "threshold_kw": threshold_kw,
               "bdgd_path": env["EV_BDGD_PATH"],
               "limit_source": env["EV_GRID_LIMIT_SOURCE"],
-              "contracted_demand_cap_kw": cap, "service_policy": policy}
+              "contracted_demand_cap_kw": cap, "service_policy": policy,
+              "demand_profile_source": "PNL" if logistics_profile_kw is not None else "synthetic",
+              "logistics_context": logistics_context}
     (output_dir / "simulation_inputs.json").write_text(
         json.dumps(inputs, indent=2, ensure_ascii=False), encoding="utf-8")
     process = subprocess.run(

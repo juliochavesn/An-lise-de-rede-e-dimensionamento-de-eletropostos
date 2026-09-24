@@ -64,10 +64,14 @@ from src.technical_results import export_technical_results
 from src.expansion_diagnostics import analyze_expansion_need
 
 
+EV_REQUEST_PROFILE_24H = None
+
+
 def apply_runtime_overrides(env=None):
     """Aplica parâmetros enviados pela interface sem alterar src/config.py."""
     global OUTPUT_DIR, SIMULATION_MODE, CONFIGS, PV_LOCATION
     global SCENARIO_BASE, SCENARIO_ANNUAL, GRID_NETWORK, TARIFF
+    global EV_REQUEST_PROFILE_24H
     env = os.environ if env is None else env
     if env.get("EV_SERVICE_POLICY"):
         from src.service_policy import normalize_policy
@@ -86,6 +90,15 @@ def apply_runtime_overrides(env=None):
             TARIFF = dict(TARIFF, contracted_demand_max_kw=cap)
     if env.get("EV_BDGD_PATH"):
         GRID_NETWORK = dict(GRID_NETWORK, bdgd_path=Path(env["EV_BDGD_PATH"]).expanduser().resolve())
+
+    if env.get("EV_REQUEST_PROFILE_24H"):
+        profile = json.loads(env["EV_REQUEST_PROFILE_24H"])
+        if not isinstance(profile, list) or len(profile) != 24:
+            raise ValueError("EV_REQUEST_PROFILE_24H deve conter 24 potências horárias.")
+        profile = [float(value) for value in profile]
+        if any(not math.isfinite(value) or value < 0 for value in profile):
+            raise ValueError("O perfil logístico deve conter potências finitas e não negativas.")
+        EV_REQUEST_PROFILE_24H = profile
 
     if env.get("EV_OUTPUT_DIR"):
         OUTPUT_DIR = Path(env["EV_OUTPUT_DIR"]).expanduser().resolve()
@@ -306,6 +319,7 @@ def run_base_scenarios():
         **scenario,
         pv_cf_external=pv_cf_external,
         grid_limit_external=grid_limit_external,
+        ev_request_external=EV_REQUEST_PROFILE_24H,
     )
 
     expansion_diagnostic = analyze_expansion_need(data, LIMITS)

@@ -53,6 +53,7 @@ def generate_profiles(
     monthly_load_factors=None,
     holiday_dates=None,
     grid_limit_external=None,
+    ev_request_external=None,
 ):
      # Gerador aleatório para reprodutibilidade.
     rng = np.random.default_rng(seed)
@@ -96,6 +97,22 @@ def generate_profiles(
 
     # Evita valores negativos de demanda.
     ev_request = np.clip(ev_request, 0.0, None)
+
+    # Um perfil logístico externo pode substituir a curva sintética. Aceita
+    # uma série para todo o horizonte ou um dia representativo, que é repetido.
+    if ev_request_external is not None:
+        external = np.asarray(ev_request_external, dtype=float)
+        intervals_per_day = int(round(24.0 / dt_h))
+        if len(external) == intervals_per_day:
+            external = np.tile(external, int(np.ceil(n / len(external))))[:n]
+        if len(external) != n:
+            raise ValueError(
+                "O perfil externo de recarga deve conter um dia completo "
+                "ou exatamente todos os intervalos da simulação."
+            )
+        if not np.isfinite(external).all() or (external < 0).any():
+            raise ValueError("O perfil externo de recarga deve ser finito e não negativo.")
+        ev_request = external.copy()
 
     # Carga local do estabelecimento [kW].
     

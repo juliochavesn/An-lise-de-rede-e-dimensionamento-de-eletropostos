@@ -11,6 +11,7 @@ Aplicação de pesquisa para análise locacional de eletropostos, avaliação pr
 - análise detalhada com BDGD local ou tratada em nuvem;
 - mapa da rede de média tensão, transformadores e subestações de distribuição;
 - camada PNL de rotas de transporte de cargas, fluxos, saturação trimestral e corredores;
+- conversão auditável do fluxo rodoviário PNL em cenários P10/P50/P90 de caminhões, recargas, energia e perfil horário;
 - estimativa temporal de capacidade residual;
 - identificação de períodos críticos e oportunidades de carregamento;
 - otimização econômica e de qualidade de atendimento;
@@ -23,7 +24,9 @@ As estimativas são instrumentos de triagem e pesquisa. Elas não substituem est
 
 As bases BDGD não são armazenadas neste repositório devido ao volume. A aplicação pode consultar os pacotes tratados no Google Drive sob demanda. O modo local continua disponível quando uma BDGD é instalada pelo usuário.
 
-A rede de transportes do PNL 2050 também é obtida do Google Drive somente quando sua camada é ativada. O arquivo é mantido em cache temporário e as consultas usam recortes espaciais. A interface aplica o dicionário oficial da Infra S.A. para identificar os modais e apresentar os carregamentos em toneladas. As saturações trimestrais são interpretadas somente para links rodoviários (`GTYPE = 1`). Os carregamentos modelados não são convertidos automaticamente em veículos ou potência de recarga.
+A rede de transportes do PNL 2050 também é obtida do Google Drive somente quando sua camada é ativada. O arquivo é mantido em cache temporário e as consultas usam recortes espaciais. A interface aplica o dicionário oficial da Infra S.A. para identificar os modais e apresentar os carregamentos em toneladas. As saturações trimestrais são interpretadas somente para links rodoviários (`GTYPE = 1`).
+
+Quando solicitado pelo usuário, o fluxo do segmento rodoviário mais próximo é convertido em demanda de recarga. O fluxo PNL continua sendo o único dado logístico observado/modelado da origem; carga útil, retornos vazios por viagem carregada, participação elétrica, captura pelo eletroposto, energia por parada e dias operacionais são hipóteses editáveis. A interface apresenta P10/P50/P90, grava as hipóteses junto aos resultados e pode enviar a curva selecionada ao otimizador. Fatores de veículo equivalente usados em capacidade viária não entram na demanda elétrica.
 
 ## Execução local
 

@@ -6,6 +6,7 @@ import json
 import math
 from pathlib import Path
 
+import altair as alt
 import folium
 import pandas as pd
 import streamlit as st
@@ -74,6 +75,16 @@ st.markdown("""
         color:#243b53 !important;
     }
     [data-testid="stMetricLabel"] p { color:#243b53 !important; }
+    .logistics-heading {
+        color:#0b2340 !important;
+        font-size:1.18rem;
+        font-weight:750;
+        line-height:1.35;
+        margin:.65rem 0 .35rem 0;
+    }
+    .logistics-copy {
+        color:#334e68 !important;
+    }
     [data-testid="stExpander"] details,
     [data-testid="stExpander"] summary,
     [data-testid="stExpander"] [data-testid="stExpanderDetails"] {
@@ -605,18 +616,56 @@ with action_col:
             if use_freight_demand and not is_road:
                 st.info("A conversão em recarga rodoviária não foi aplicada porque o segmento mais próximo não é rodoviário.")
             elif freight_analysis:
-                st.subheader("Cenários de demanda logístico-elétrica")
+                st.markdown(
+                    '<div class="logistics-heading">Cenários de demanda logístico-elétrica</div>',
+                    unsafe_allow_html=True,
+                )
                 demand_table = pd.DataFrame(scenario_table(freight_analysis))
                 st.dataframe(
-                    demand_table.style.format({column: "{:,.1f}" for column in demand_table.columns if column != "Cenário"}),
+                    demand_table,
                     hide_index=True, use_container_width=True,
+                    column_config={
+                        column: st.column_config.NumberColumn(column, format="%.1f")
+                        for column in demand_table.columns if column != "Cenário"
+                    },
                 )
                 selected_freight = freight_analysis["scenarios"][freight_scenario]
                 profile_table = pd.DataFrame({
-                    "Hora": list(range(24)),
+                    "Hora do dia (h)": list(range(24)),
                     "Demanda de recarga (kW)": selected_freight["hourly_profile_kw"],
-                }).set_index("Hora")
-                st.line_chart(profile_table)
+                })
+                profile_chart = (
+                    alt.Chart(profile_table)
+                    .mark_line(point=True, strokeWidth=3, color="#0b63ce")
+                    .encode(
+                        x=alt.X(
+                            "Hora do dia (h):Q",
+                            title="Hora do dia (h)",
+                            scale=alt.Scale(domain=[0, 23]),
+                            axis=alt.Axis(values=list(range(0, 24, 2))),
+                        ),
+                        y=alt.Y(
+                            "Demanda de recarga (kW):Q",
+                            title="Demanda de recarga (kW)",
+                            scale=alt.Scale(zero=True),
+                        ),
+                        tooltip=[
+                            alt.Tooltip("Hora do dia (h):Q", title="Hora", format=".0f"),
+                            alt.Tooltip("Demanda de recarga (kW):Q", title="Demanda", format=",.1f"),
+                        ],
+                    )
+                    .properties(
+                        title=f"Perfil horário de recarga — cenário {freight_scenario}",
+                        height=320,
+                    )
+                    .configure_axis(
+                        labelColor="#243b53", titleColor="#0b2340",
+                        gridColor="#dbe6f1", titleFontSize=13, labelFontSize=11,
+                    )
+                    .configure_title(color="#0b2340", fontSize=15, anchor="start")
+                    .configure_view(strokeColor="#dbe6f1")
+                )
+                st.altair_chart(profile_chart, use_container_width=True)
                 st.caption(
                     f"{freight_scenario}: {selected_freight['charging_events_per_day']:.1f} recargas/dia, "
                     f"{selected_freight['daily_energy_kwh']:,.1f} kWh/dia e pico representativo de "

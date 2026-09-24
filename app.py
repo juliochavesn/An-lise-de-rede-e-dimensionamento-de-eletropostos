@@ -673,11 +673,13 @@ with action_col:
                     .configure_axis(
                         labelColor="#243b53", titleColor="#0b2340",
                         gridColor="#dbe6f1", titleFontSize=13, labelFontSize=11,
+                        domainColor="#52657a", tickColor="#52657a",
                     )
                     .configure_title(color="#0b2340", fontSize=15, anchor="start")
-                    .configure_view(stroke="#dbe6f1")
+                    .configure_view(fill="#ffffff", stroke="#dbe6f1")
+                    .configure(background="#ffffff")
                 )
-                st.altair_chart(profile_chart, use_container_width=True)
+                st.altair_chart(profile_chart, use_container_width=True, theme=None)
                 st.caption(
                     f"{freight_scenario}: {selected_freight['charging_events_per_day']:.1f} recargas/dia, "
                     f"{selected_freight['daily_energy_kwh']:,.1f} kWh/dia e pico representativo de "

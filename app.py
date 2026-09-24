@@ -633,45 +633,6 @@ with action_col:
                     "foram omitidas para não misturar consumidores AT ou instalações particulares."
                 )
 
-    if pnl_error:
-        st.error(f"Camada PNL indisponível: {pnl_error}")
-    elif pnl_data:
-        nearest_pnl = pnl_data["nearest"]
-        with st.expander("Diagnóstico logístico PNL", expanded=True):
-            st.metric("Distância à rota de carga mais próxima", f"{nearest_pnl['distance_km']:.2f} km")
-            st.write(f"**Segmento PNL:** {nearest_pnl['segment_id']}")
-            modal = nearest_pnl.get("modal") or gtype_label(nearest_pnl.get("gtype"))
-            is_road = nearest_pnl.get("is_road", nearest_pnl.get("gtype") == 1)
-            st.write(f"**Modal:** {modal} (`GTYPE = {nearest_pnl['gtype']}`)")
-            st.write(f"**Corredor:** {nearest_pnl['corridor']}")
-            saturation = nearest_pnl.get("max_saturation")
-            st.write("**Saturação máxima:** " + (
-                f"{saturation * 100:.1f}% · {nearest_pnl['saturation_label']}"
-                if saturation is not None else (
-                    "não aplicável ao modal" if not is_road else "não informada"
-                )
-            ))
-            st.write(f"**Carregamento total modelado:** {nearest_pnl['total_flow']:,.0f} t")
-            if nearest_pnl.get("main_load_group"):
-                st.write(f"**Grupo de carga predominante:** {nearest_pnl['main_load_group']}")
-                composition = pd.DataFrame([
-                    {"Grupo de carga": group, "Carregamento (t)": value}
-                    for group, value in nearest_pnl["load_composition_t"].items()
-                    if value > 0
-                ]).sort_values("Carregamento (t)", ascending=False)
-                if not composition.empty:
-                    with st.expander("Composição do carregamento por grupo"):
-                        st.dataframe(composition, hide_index=True, use_container_width=True)
-            st.caption(
-                f"{pnl_data['segment_count']} trechos no raio; "
-                f"{pnl_data['road_segment_count']} rodoviários; "
-                f"{pnl_data['corridor_segment_count']} classificados como corredores; "
-                f"{pnl_data['high_saturation_count']} links rodoviários com saturação ≥80%."
-            )
-            st.warning(pnl_data["interpretation_warning"])
-            if use_freight_demand and not is_road:
-                st.info("A conversão em recarga rodoviária não foi aplicada porque o segmento mais próximo não é rodoviário.")
-
     if st.button("Analisar rede neste ponto", type="primary", use_container_width=True,
                  disabled=not inside_coverage):
         with st.spinner("Consultando a BDGD e calculando capacidade residual..."):
@@ -719,6 +680,64 @@ with action_col:
                         st.session_state.demand_comparison_history = history[-10:]
             except Exception as exc:
                 st.error(str(exc))
+
+if pnl_error:
+    st.error(f"Camada PNL indisponível: {pnl_error}")
+elif pnl_data:
+    nearest_pnl = pnl_data["nearest"]
+    modal = nearest_pnl.get("modal") or gtype_label(nearest_pnl.get("gtype"))
+    is_road = nearest_pnl.get("is_road", nearest_pnl.get("gtype") == 1)
+    saturation = nearest_pnl.get("max_saturation")
+    saturation_display = (
+        f"{saturation * 100:.1f}%"
+        if saturation is not None else ("Não aplicável" if not is_road else "Não informada")
+    )
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(
+        '<div class="section-eyebrow">PNL 2050 · Diagnóstico do corredor</div>'
+        '<div class="section-title">Diagnóstico logístico PNL</div>'
+        '<div class="section-copy">Caracterização horizontal da rota de carga mais próxima e do recorte territorial analisado.</div>',
+        unsafe_allow_html=True,
+    )
+    pnl_metrics = st.columns(6)
+    pnl_metrics[0].metric("Distância à rota", f"{nearest_pnl['distance_km']:.2f} km")
+    pnl_metrics[1].metric("Modal", modal)
+    pnl_metrics[2].metric("Corredor", nearest_pnl["corridor"])
+    pnl_metrics[3].metric("Carregamento modelado", f"{nearest_pnl['total_flow']:,.0f} t")
+    pnl_metrics[4].metric("Saturação máxima", saturation_display)
+    pnl_metrics[5].metric("Carga predominante", nearest_pnl.get("main_load_group") or "Não informada")
+    st.caption(
+        f"Segmento PNL {nearest_pnl['segment_id']} · GTYPE = {nearest_pnl['gtype']} · "
+        f"{nearest_pnl['saturation_label']}"
+    )
+
+    composition = pd.DataFrame([
+        {"Grupo de carga": group, "Carregamento (t)": value}
+        for group, value in nearest_pnl["load_composition_t"].items()
+        if value > 0
+    ]).sort_values("Carregamento (t)", ascending=False)
+    composition_col, scope_col = st.columns([1.2, 1], gap="large")
+    with composition_col:
+        st.markdown('<div class="logistics-heading">Composição do carregamento</div>', unsafe_allow_html=True)
+        if composition.empty:
+            st.info("A composição por grupo não está informada neste segmento.")
+        else:
+            st.dataframe(
+                composition, hide_index=True, use_container_width=True,
+                column_config={
+                    "Carregamento (t)": st.column_config.NumberColumn("Carregamento (t)", format="%.0f")
+                },
+            )
+    with scope_col:
+        st.markdown('<div class="logistics-heading">Abrangência do recorte</div>', unsafe_allow_html=True)
+        scope_metrics = st.columns(2)
+        scope_metrics[0].metric("Trechos no raio", pnl_data["segment_count"])
+        scope_metrics[1].metric("Trechos rodoviários", pnl_data["road_segment_count"])
+        scope_metrics[0].metric("Corredores classificados", pnl_data["corridor_segment_count"])
+        scope_metrics[1].metric("Links com saturação ≥80%", pnl_data["high_saturation_count"])
+        st.warning(pnl_data["interpretation_warning"])
+        if use_freight_demand and not is_road:
+            st.info("A conversão em recarga não foi aplicada porque o segmento mais próximo não é rodoviário.")
 
 if freight_analysis:
     selected_freight = freight_analysis["scenarios"][freight_scenario]

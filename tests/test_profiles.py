@@ -24,6 +24,26 @@ def test_annual_mode_builds_complete_non_leap_year():
     )
 
 
+def test_hourly_logistics_profile_is_resampled_for_daily_quarter_hour_mode():
+    hourly = [float(hour + 1) for hour in range(24)]
+    data = generate_profiles(**SCENARIO_BASE, ev_request_external=hourly)
+
+    values = [data["request_kw"][index] for index in data["time_index"]]
+    assert len(values) == 96
+    assert values[0] == pytest.approx(hourly[0])
+    assert values[1] == pytest.approx(1.25)
+    assert sum(values) * SCENARIO_BASE["dt_h"] == pytest.approx(sum(hourly))
+
+
+def test_hourly_logistics_profile_repeats_over_annual_mode():
+    hourly = [float(hour + 1) for hour in range(24)]
+    data = generate_profiles(**SCENARIO_ANNUAL, ev_request_external=hourly)
+
+    values = [data["request_kw"][index] for index in data["time_index"]]
+    assert values[:24] == pytest.approx(hourly)
+    assert values[24:48] == pytest.approx(hourly)
+
+
 def test_annual_peak_tariff_is_not_applied_on_weekends():
     scenario = dict(SCENARIO_ANNUAL)
     scenario.update({"price_offpeak": 1.0, "price_peak": 2.0})

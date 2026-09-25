@@ -28,6 +28,25 @@ def gaussian(x, mu, sigma, amp):
     return amp * np.exp(-0.5 * ((x - mu) / sigma) ** 2)
 
 
+def _resample_hourly_daily_profile(profile, dt_h):
+    """Converte 24 potências horárias para a resolução do modelo.
+
+    A interpolação é periódica entre 23h e 0h. Para passos que dividem
+    exatamente o dia, conserva a energia diária representada pelo perfil
+    original (soma das 24 potências horárias em kWh).
+    """
+    profile = np.asarray(profile, dtype=float)
+    intervals_per_day = int(round(24.0 / dt_h))
+    if not math.isclose(intervals_per_day * dt_h, 24.0, rel_tol=0.0, abs_tol=1e-9):
+        raise ValueError("O passo temporal deve dividir exatamente um dia de 24 horas.")
+    if intervals_per_day == 24:
+        return profile.copy()
+    source_hours = np.arange(25, dtype=float)
+    periodic_profile = np.concatenate([profile, profile[:1]])
+    target_hours = np.arange(intervals_per_day, dtype=float) * dt_h
+    return np.interp(target_hours, source_hours, periodic_profile)
+
+
 def generate_profiles(
     horizon_h=24.0,
     dt_h=0.25,
@@ -99,16 +118,21 @@ def generate_profiles(
     ev_request = np.clip(ev_request, 0.0, None)
 
     # Um perfil logístico externo pode substituir a curva sintética. Aceita
-    # uma série para todo o horizonte ou um dia representativo, que é repetido.
+    # uma série para todo o horizonte, um dia na resolução do modelo ou as
+    # 24 potências horárias produzidas pela conversão PNL. Neste último caso,
+    # reamostra automaticamente e depois repete o dia pelo horizonte.
     if ev_request_external is not None:
         external = np.asarray(ev_request_external, dtype=float)
         intervals_per_day = int(round(24.0 / dt_h))
+        if len(external) == 24:
+            external = _resample_hourly_daily_profile(external, dt_h)
         if len(external) == intervals_per_day:
             external = np.tile(external, int(np.ceil(n / len(external))))[:n]
         if len(external) != n:
             raise ValueError(
-                "O perfil externo de recarga deve conter um dia completo "
-                "ou exatamente todos os intervalos da simulação."
+                "O perfil externo de recarga deve conter 24 potências horárias, "
+                "um dia completo na resolução do modelo ou exatamente todos "
+                "os intervalos da simulação."
             )
         if not np.isfinite(external).all() or (external < 0).any():
             raise ValueError("O perfil externo de recarga deve ser finito e não negativo.")

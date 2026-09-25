@@ -9,6 +9,16 @@ import numpy as np
 import pandas as pd
 
 
+def _longest_run_hours(mask: pd.Series, interval_hours: float) -> float:
+    """Retorna a maior duração consecutiva verdadeira, em horas."""
+    values = mask.fillna(False).astype(bool).to_numpy()
+    longest = current = 0
+    for value in values:
+        current = current + 1 if value else 0
+        longest = max(longest, current)
+    return float(longest * interval_hours)
+
+
 def analyze_capacity_profile(audit: pd.DataFrame, threshold_kw: float,
                              preferred_hour_count: int = 6,
                              zero_tolerance_kw: float = 1e-6):
@@ -40,6 +50,11 @@ def analyze_capacity_profile(audit: pd.DataFrame, threshold_kw: float,
     )
     frame["is_zero"] = frame["residual_capacity_kw"] <= zero_tolerance_kw
     frame["is_critical"] = frame["residual_capacity_kw"] < threshold_kw
+    ordered = frame.sort_values("timestamp").reset_index(drop=True)
+    deltas = ordered["timestamp"].diff().dt.total_seconds().div(3600.0)
+    positive_deltas = deltas[deltas > 0]
+    interval_hours = float(positive_deltas.median()) if not positive_deltas.empty else 1.0
+    residual = frame["residual_capacity_kw"]
 
     daily = frame.groupby("date")["residual_capacity_kw"].agg(
         minimum_kw="min", mean_kw="mean", maximum_kw="max"
@@ -98,6 +113,23 @@ def analyze_capacity_profile(audit: pd.DataFrame, threshold_kw: float,
         "profile_interval_count": int(len(frame)),
         "zero_capacity_interval_count": int(frame["is_zero"].sum()),
         "critical_interval_count": int(frame["is_critical"].sum()),
+        "profile_interval_hours": interval_hours,
+        "residual_capacity_kw_min": float(residual.min()),
+        "residual_capacity_kw_p01": float(residual.quantile(0.01)),
+        "residual_capacity_kw_p05": float(residual.quantile(0.05)),
+        "residual_capacity_kw_p10": float(residual.quantile(0.10)),
+        "residual_capacity_kw_median": float(residual.quantile(0.50)),
+        "residual_capacity_kw_mean": float(residual.mean()),
+        "residual_capacity_kw_p90": float(residual.quantile(0.90)),
+        "residual_capacity_kw_max": float(residual.max()),
+        "robust_screening_reference_kw": float(residual.quantile(0.05)),
+        "robust_screening_reference_percentile": 5,
+        "longest_zero_capacity_run_hours": _longest_run_hours(
+            ordered["is_zero"], interval_hours
+        ),
+        "longest_critical_run_hours": _longest_run_hours(
+            ordered["is_critical"], interval_hours
+        ),
         "worst_date": str(worst_date),
         "worst_day_minimum_kw": float(daily.iloc[0]["minimum_kw"]),
         "worst_day_mean_kw": float(daily.iloc[0]["mean_kw"]),

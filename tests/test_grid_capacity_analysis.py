@@ -34,6 +34,11 @@ def test_analysis_finds_worst_day_and_constrained_hours():
     assert summary["critical_interval_count"] == 4
     assert summary["constrained_hours_p10_below_threshold"] == [19, 20]
     assert summary["preferred_charging_hours"] == [0, 1, 2]
+    assert summary["residual_capacity_kw_min"] == 0.0
+    assert summary["residual_capacity_kw_p05"] >= 50.0
+    assert summary["residual_capacity_kw_median"] == 800.0
+    assert summary["longest_critical_run_hours"] == 2.0
+    assert summary["longest_zero_capacity_run_hours"] == 1.0
 
 
 def test_permanent_analysis_writes_all_outputs(tmp_path):

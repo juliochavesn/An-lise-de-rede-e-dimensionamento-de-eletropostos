@@ -629,6 +629,12 @@ def write_connection_detail_outputs(detail: dict, path_frame: pd.DataFrame,
 - Limiar operacional analisado: {critical_analysis['threshold_kw']:.1f} kW
 - Intervalos abaixo do limiar: {critical_analysis['critical_interval_count']}
 - Intervalos com capacidade zero: {critical_analysis['zero_capacity_interval_count']}
+- Mínimo absoluto: {critical_analysis.get('residual_capacity_kw_min', float('nan')):.2f} kW
+- P5 (referência robusta de triagem): {critical_analysis.get('residual_capacity_kw_p05', float('nan')):.2f} kW
+- P10: {critical_analysis.get('residual_capacity_kw_p10', float('nan')):.2f} kW
+- Mediana: {critical_analysis.get('residual_capacity_kw_median', float('nan')):.2f} kW
+- Maior sequência abaixo do limiar: {critical_analysis.get('longest_critical_run_hours', 0.0):.2f} h
+- Maior sequência sem margem incremental: {critical_analysis.get('longest_zero_capacity_run_hours', 0.0):.2f} h
 - Horas preferenciais pelo P10: {preferred}
 - Horas com P10 abaixo do limiar: {constrained}
 """
@@ -694,6 +700,12 @@ O limite usado pelo otimizador combina a margem do caminho e a margem estimada
 do transformador compartilhado. Intervalo com capacidade
 residual zero significa ausencia de margem incremental sob as premissas adotadas,
 nao interrupcao do fornecimento existente.
+
+O minimo absoluto representa o intervalo mais restritivo e pode ser influenciado
+por um evento isolado. O P5 e apresentado como referencia robusta de triagem:
+95% dos intervalos possuem residual igual ou superior a esse valor. Ele nao
+substitui a serie temporal no otimizador, nao elimina intervalos criticos e nao
+representa potencia oficialmente disponibilizada pela concessionaria.
 
 ## Conclusoes automaticas
 

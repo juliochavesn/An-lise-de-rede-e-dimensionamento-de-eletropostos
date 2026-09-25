@@ -375,8 +375,8 @@ with st.sidebar:
         include_uncertain = st.checkbox("Incluir acesso condicionado ou não informado", value=False)
         st.caption("Fonte: Open Charge Map. Cache de 6 h; estado cadastral, não ocupação em tempo real.")
     show_pnl = st.toggle(
-        "Exibir rotas de transporte de cargas (PNL)", value=True,
-        help="Camada logística independente da BDGD. O primeiro acesso baixa e prepara o pacote mantido no Google Drive.",
+        "Exibir rotas de veículos pesados de carga (PNL)", value=True,
+        help="Camada de transporte de cargas do PNL, independente da BDGD. Não representa automóveis nem outros veículos leves.",
     )
     pnl_radius_km, pnl_display_mode = 15.0, "Saturação"
     use_freight_demand = False
@@ -389,12 +389,14 @@ with st.sidebar:
             ["Saturação", "Carregamento total", "Modal", "Corredores"],
         )
         st.caption(
-            "PNL 2050: carregamentos modelados em toneladas. A saturação trimestral "
-            "se aplica apenas aos links rodoviários."
+            "PNL 2050: fluxos de mercadorias modelados em toneladas para transporte de "
+            "cargas. A conversão elétrica desta aplicação representa caminhões pesados; "
+            "veículos leves não estão incluídos. A saturação trimestral se aplica "
+            "apenas aos links rodoviários."
         )
         use_freight_demand = st.toggle(
-            "Converter fluxo PNL em demanda de recarga", value=True,
-            help="Ativa cenários auditáveis; hipóteses de frota e recarga não são dados oficiais do PNL.",
+            "Converter fluxo PNL de cargas em recarga de caminhões elétricos", value=True,
+            help="Ativa cenários auditáveis para veículos pesados. As hipóteses de eletrificação e recarga não são dados oficiais do PNL.",
         )
         if use_freight_demand:
             freight_scenario = st.selectbox("Cenário logístico aplicado", ["P10", "P50", "P90"], index=1)
@@ -786,9 +788,9 @@ elif pnl_data:
     )
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown(
-        '<div class="section-eyebrow">PNL 2050 · Diagnóstico do corredor</div>'
-        '<div class="section-title">Diagnóstico logístico PNL</div>'
-        '<div class="section-copy">Caracterização horizontal da rota de carga mais próxima e do recorte territorial analisado.</div>',
+        '<div class="section-eyebrow">PNL 2050 · Veículos pesados de carga</div>'
+        '<div class="section-title">Diagnóstico logístico de cargas</div>'
+        '<div class="section-copy">Caracterização da rota de mercadorias mais próxima. Não inclui demanda de automóveis ou outros veículos leves.</div>',
         unsafe_allow_html=True,
     )
     pnl_metric_values = [
@@ -849,9 +851,9 @@ if freight_analysis:
     selected_freight = freight_analysis["scenarios"][freight_scenario]
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown(
-        '<div class="section-eyebrow">Integração PNL · Demanda de recarga</div>'
+        '<div class="section-eyebrow">Integração PNL · Caminhões elétricos</div>'
         '<div class="section-title">Cenários de demanda logístico-elétrica</div>'
-        '<div class="section-copy">Conversão paramétrica do carregamento rodoviário em viagens, recargas e potência horária.</div>',
+        '<div class="section-copy">Conversão paramétrica do fluxo rodoviário de cargas em viagens de caminhões pesados, recargas e potência horária.</div>',
         unsafe_allow_html=True,
     )
     metric_cols = st.columns(5)
@@ -954,23 +956,54 @@ if "network_result" in st.session_state:
         st.error("Análise BDGD inconclusiva: não foi possível validar a capacidade da rede neste ponto.")
         st.warning("O motor acionou o limite manual de segurança. Esse valor não representa capacidade residual BDGD e não será apresentado como disponibilidade da rede.")
         st.write("**Motivo:** " + assessment.get("error", "Diagnóstico indisponível; execute novamente a análise."))
+    p05_kw = critical.get("residual_capacity_kw_p05")
+    p10_kw = critical.get("residual_capacity_kw_p10")
+    median_kw = critical.get("residual_capacity_kw_median")
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Capacidade residual mínima", f"{result['minimum_kw']:,.1f} kW" if valid_network else "Indisponível")
-    m2.metric("Capacidade residual média", f"{result['mean_kw']:,.1f} kW" if valid_network else "Indisponível")
-    m3.metric("Capacidade residual máxima", f"{result['maximum_kw']:,.1f} kW" if valid_network else "Indisponível")
-    m4.metric("Intervalos críticos", critical.get("critical_interval_count", "—"))
-    st.info("Triagem baseada na BDGD pública; não substitui estudo de acesso nem parecer da concessionária.")
+    m1.metric("Mínimo absoluto", f"{result['minimum_kw']:,.1f} kW" if valid_network else "Indisponível")
+    m2.metric("Referência robusta P5", f"{p05_kw:,.1f} kW" if valid_network and p05_kw is not None else "—")
+    m3.metric("P10 da capacidade residual", f"{p10_kw:,.1f} kW" if valid_network and p10_kw is not None else "—")
+    m4.metric("Mediana", f"{median_kw:,.1f} kW" if valid_network and median_kw is not None else "—")
+    d1, d2, d3, d4 = st.columns(4)
+    d1.metric("Média", f"{result['mean_kw']:,.1f} kW" if valid_network else "Indisponível")
+    d2.metric("Máximo", f"{result['maximum_kw']:,.1f} kW" if valid_network else "Indisponível")
+    d3.metric("Intervalos críticos", critical.get("critical_interval_count", "—"))
+    d4.metric("Maior sequência crítica", f"{critical.get('longest_critical_run_hours', 0):,.1f} h" if valid_network else "—")
+    st.info(
+        "O mínimo absoluto revela a condição mais restritiva, mas pode refletir um evento isolado. "
+        "O P5 é uma referência robusta de triagem: 95% dos intervalos apresentam residual igual "
+        "ou superior a ele. O otimizador continua respeitando cada intervalo da série, e nenhum "
+        "percentil representa potência oficialmente disponível. A BDGD pública não substitui o estudo de acesso."
+    )
+    with st.expander("Dados usados na análise e fontes complementares"):
+        st.markdown(
+            "- **Cálculo elétrico:** topologia, alimentador, subestação de distribuição, "
+            "condutores, transformadores, carga e geração distribuída da BDGD.\n"
+            "- **Série temporal:** curvas tipificadas da própria BDGD, preservadas intervalo a intervalo.\n"
+            "- **Consultas públicas complementares:** continuidade (DEC/FEC), tarifas, consumo e "
+            "demanda ajudam a caracterizar a área, quando disponíveis no catálogo ANEEL/API.\n"
+            "- **Limite metodológico:** indicadores públicos agregados não são convertidos em "
+            "potência disponível e não substituem medições, fluxo de potência, curto-circuito, "
+            "proteção ou parecer de acesso da distribuidora."
+        )
     if valid_network and freight_analysis:
         selected_freight = freight_analysis["scenarios"][freight_scenario]
         logistics_peak = selected_freight["profile_peak_kw"] * demand_scale
         limiting_residual = float(result["minimum_kw"])
+        robust_residual = float(p05_kw) if p05_kw is not None else limiting_residual
         deficit_kw = max(0.0, logistics_peak - limiting_residual)
+        robust_deficit_kw = max(0.0, logistics_peak - robust_residual)
         st.subheader("Compatibilidade preliminar entre fluxo logístico e rede")
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Cenário", freight_scenario)
         c2.metric("Pico de recarga estimado", f"{logistics_peak:,.1f} kW")
         c3.metric("Residual mínimo BDGD", f"{limiting_residual:,.1f} kW")
         c4.metric("Déficit instantâneo indicativo", f"{deficit_kw:,.1f} kW")
+        st.caption(
+            f"Leitura robusta P5: residual de {robust_residual:,.1f} kW e déficit de "
+            f"{robust_deficit_kw:,.1f} kW. Esta leitura contextualiza extremos; a simulação "
+            "não descarta os intervalos mais restritivos."
+        )
         if deficit_kw > 0:
             st.warning(
                 "O pico representativo supera o menor residual estimado. Isso não torna o "

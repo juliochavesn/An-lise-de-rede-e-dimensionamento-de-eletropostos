@@ -23,12 +23,25 @@ from src.service_policy import describe_policy
 from src.cloud_bdgd import CLOUD_DATASETS, load_cloud_coverage, prepare_cloud_point
 from src.pnl_routes import add_pnl_layer, gtype_label, load_pnl_window
 from src.freight_energy import (
-    ICCT_OPERATION_CYCLES,
     FreightAssumptions,
     estimate_freight_charging,
     scenario_table,
 )
 from access_counter import register_access, render_access_footer
+
+
+# Mantido na camada de interface para evitar que um cache transitório do
+# Streamlit combine o app novo com uma versão anterior do módulo de cálculo.
+ICCT_OPERATION_CYCLES = {
+    "Long-Haul (LH)": {
+        "payload_t": 19.3,
+        "energy_consumption_kwh_per_km": 1.38,
+    },
+    "Regional Delivery (RD)": {
+        "payload_t": 12.9,
+        "energy_consumption_kwh_per_km": 0.93,
+    },
+}
 
 
 st.set_page_config(
@@ -414,16 +427,23 @@ with st.sidebar:
                 capture_share = st.number_input("Captura pelo eletroposto (%)", 0.0, 100.0, 20.0, 1.0) / 100
                 energy_stop = st.number_input("Energia por parada (kWh)", 1.0, 1500.0, 250.0, 10.0)
                 operating_days = st.number_input("Dias operacionais por ano", 1, 366, 365, 1)
-                freight_assumptions = FreightAssumptions(
-                    operation_cycle=operation_cycle,
+                assumption_kwargs = dict(
                     payload_t=payload_t,
-                    energy_consumption_kwh_per_km=energy_consumption,
                     empty_returns_per_loaded_trip=empty_ratio,
                     electric_share=electric_share,
                     station_capture_share=capture_share,
                     energy_per_stop_kwh=energy_stop,
                     operating_days_per_year=int(operating_days),
                 )
+                # Compatibilidade com processos que ainda tenham a classe anterior
+                # em cache durante um redeploy. Na versão atual, os campos ICCT são
+                # incluídos e persistidos normalmente nos resultados.
+                dataclass_fields = getattr(FreightAssumptions, "__dataclass_fields__", {})
+                if "operation_cycle" in dataclass_fields:
+                    assumption_kwargs["operation_cycle"] = operation_cycle
+                if "energy_consumption_kwh_per_km" in dataclass_fields:
+                    assumption_kwargs["energy_consumption_kwh_per_km"] = energy_consumption
+                freight_assumptions = FreightAssumptions(**assumption_kwargs)
                 st.caption(
                     "Intensidade carregada: "
                     f"{energy_consumption / payload_t:.4f} kWh/t·km "

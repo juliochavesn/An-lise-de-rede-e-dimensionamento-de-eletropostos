@@ -53,7 +53,7 @@ def test_popup_escapes_external_markup():
     from src import ocm_ui
     row = ocm.normalize([station()], -22.817, -47.069, 10)[0]
     row["name"] = '<img src=x onerror="alert(1)">'
-    with patch.object(ocm_ui, "cached_ocm", return_value={"stations": [row], "partial": False, "retrieved_at": "test"}):
+    with patch.object(ocm_ui, "cached_ocm", return_value={"stations": [row], "partial": False, "retrieved_at": "test"}), patch.object(ocm_ui, "cached_google_evcs", return_value={"stations": [], "database_updated_at": "test"}):
         view = folium.Map()
         ocm_ui.add_ocm_layer(view, -22.817, -47.069, 10)
         rendered = view.get_root().render()

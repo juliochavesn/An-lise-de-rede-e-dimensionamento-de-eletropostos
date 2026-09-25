@@ -372,8 +372,8 @@ with st.sidebar:
     station_radius = 10.0
     if show_stations:
         station_radius = st.slider("Raio dos eletropostos (km)", 1, 25, 10)
-        include_uncertain = st.checkbox("Incluir acesso condicionado ou não informado", value=False)
-        st.caption("Fonte: Open Charge Map. Cache de 6 h; estado cadastral, não ocupação em tempo real.")
+        include_uncertain = st.checkbox("Incluir acesso condicionado ou não informado", value=True)
+        st.caption("Fontes: Google Places + Open Charge Map, com deduplicação espacial. Cache de 6 h; estado cadastral, não ocupação em tempo real.")
     show_pnl = st.toggle(
         "Exibir rotas de veículos pesados de carga (PNL)", value=True,
         help="Camada de transporte de cargas do PNL, independente da BDGD. Não representa automóveis nem outros veículos leves.",

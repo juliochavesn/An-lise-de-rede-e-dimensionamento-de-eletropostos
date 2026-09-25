@@ -63,7 +63,7 @@ def test_ui_national_navigation_and_optional_charging_layer():
     coverage = {"geometry": polygon, "bounds": [[-24, -51], [-19, -46]],
                 "geojson": {"type": "FeatureCollection", "features": [
                     {"type": "Feature", "properties": {}, "geometry": mapping(polygon)}]}}
-    with patch("src.grid_map.load_bdgd_coverage", return_value=coverage), patch("src.grid_map.load_network_window", side_effect=LookupError("Sem rede")), patch("streamlit_folium.st_folium", return_value={}), patch("src.ocm_ui.cached_ocm", return_value={"stations": [], "partial": False, "retrieved_at": "test"}) as fetch:
+    with patch("src.grid_map.load_bdgd_coverage", return_value=coverage), patch("src.grid_map.load_network_window", side_effect=LookupError("Sem rede")), patch("streamlit_folium.st_folium", return_value={}), patch("src.ocm_ui.cached_ocm", return_value={"stations": [], "partial": False, "retrieved_at": "test"}) as fetch, patch("src.ocm_ui.cached_google_evcs", return_value={"stations": [], "database_updated_at": "test"}):
         app = AppTest.from_file(str(Path(__file__).parents[1] / "app.py")).run()
         app.radio(key="analysis_mode").set_value("Detalhada — BDGD local").run()
         assert not app.exception

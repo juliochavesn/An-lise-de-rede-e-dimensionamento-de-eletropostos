@@ -104,7 +104,7 @@ def test_online_ocm_only_and_tariff_filters_invalidate_results(tmp_path):
     root = Path(__file__).parents[1]
     assert not (root / "src/charging_stations.py").exists()
     assert "overpass" not in (root / "app.py").read_text().lower()
-    with patch("streamlit_folium.st_folium", return_value={}), patch("src.ocm_ui.cached_ocm", return_value={"stations": [], "partial": False, "retrieved_at": "test"}) as fetch:
+    with patch("streamlit_folium.st_folium", return_value={}), patch("src.ocm_ui.cached_ocm", return_value={"stations": [], "partial": False, "retrieved_at": "test"}) as fetch, patch("src.ocm_ui.cached_google_evcs", return_value={"stations": [], "database_updated_at": "test"}):
         app = AppTest.from_file(str(root / "app.py")).run()
         assert not app.exception
         fetch.assert_not_called()

@@ -66,8 +66,9 @@ def render_online():
         include_uncertain, station_radius = False, 10
         if show_stations:
             station_radius = st.slider("Raio dos eletropostos (km)", 1, 25, 10)
-            include_uncertain = st.checkbox("Incluir acesso condicionado ou não informado", value=False)
-        show_pnl = st.toggle("Exibir rotas de transporte de cargas (PNL)", value=False)
+            include_uncertain = st.checkbox("Incluir acesso condicionado ou não informado", value=True)
+            st.caption("Fontes: Google Places + Open Charge Map, com deduplicação espacial.")
+        show_pnl = st.toggle("Exibir rotas de veículos pesados de carga (PNL)", value=False)
         pnl_radius, pnl_mode = 15, "Saturação"
         if show_pnl:
             pnl_radius = st.slider("Raio das rotas PNL (km)", 5, 50, 15, 5, key="online_pnl_radius")
@@ -77,8 +78,9 @@ def render_online():
                 key="online_pnl_mode",
             )
             st.caption(
-                "PNL 2050: carregamentos modelados em toneladas. A saturação trimestral "
-                "se aplica apenas aos links rodoviários."
+                "PNL 2050: fluxos de mercadorias modelados em toneladas para caminhões "
+                "pesados; não inclui veículos leves. A saturação trimestral se aplica "
+                "apenas aos links rodoviários."
             )
 
     lat, lon = st.session_state.latitude, st.session_state.longitude

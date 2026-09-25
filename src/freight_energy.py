@@ -11,11 +11,30 @@ from dataclasses import asdict, dataclass, replace
 from math import exp
 
 
+# Referências de ciclo VECTO/ICCT informadas para a calibração do modelo.
+# O consumo é de tração por veículo; a intensidade por tonelada-quilômetro
+# é derivada dividindo-o pela carga útil de referência.
+ICCT_OPERATION_CYCLES = {
+    "Long-Haul (LH)": {
+        "payload_t": 19.3,
+        "energy_consumption_kwh_per_km": 1.38,
+        "source": "ICCT/VECTO - ciclo Long-Haul, tecnologia 2023",
+    },
+    "Regional Delivery (RD)": {
+        "payload_t": 12.9,
+        "energy_consumption_kwh_per_km": 0.93,
+        "source": "ICCT/VECTO - ciclo Regional Delivery, tecnologia 2023",
+    },
+}
+
+
 @dataclass(frozen=True)
 class FreightAssumptions:
     """Hipóteses centrais usadas para converter toneladas em energia."""
 
-    payload_t: float = 30.0
+    operation_cycle: str = "Long-Haul (LH)"
+    payload_t: float = 19.3
+    energy_consumption_kwh_per_km: float = 1.38
     empty_returns_per_loaded_trip: float = 0.35
     electric_share: float = 0.15
     station_capture_share: float = 0.20
@@ -23,8 +42,14 @@ class FreightAssumptions:
     operating_days_per_year: int = 365
 
     def validate(self) -> None:
-        if self.payload_t <= 0 or self.energy_per_stop_kwh <= 0:
-            raise ValueError("Carga útil e energia por parada devem ser positivas.")
+        if (
+            self.payload_t <= 0
+            or self.energy_consumption_kwh_per_km <= 0
+            or self.energy_per_stop_kwh <= 0
+        ):
+            raise ValueError(
+                "Carga útil, consumo por quilômetro e energia por parada devem ser positivos."
+            )
         if self.operating_days_per_year <= 0:
             raise ValueError("Dias operacionais devem ser positivos.")
         if self.empty_returns_per_loaded_trip < 0:
@@ -106,6 +131,9 @@ def estimate_freight_charging(
         charging_events_day = electric_trucks_day * values.station_capture_share
         daily_energy_kwh = charging_events_day * values.energy_per_stop_kwh
         hourly_profile = [daily_energy_kwh * share for share in shares]
+        energy_intensity_kwh_per_tkm = (
+            values.energy_consumption_kwh_per_km / values.payload_t
+        )
         scenarios[label] = {
             "annual_tonnes": annual_tonnes,
             "loaded_trips_per_year": loaded_trips_year,
@@ -117,6 +145,8 @@ def estimate_freight_charging(
             "mean_power_kw": daily_energy_kwh / 24.0,
             "profile_peak_kw": max(hourly_profile),
             "hourly_profile_kw": hourly_profile,
+            "energy_intensity_kwh_per_tkm": energy_intensity_kwh_per_tkm,
+            "energy_intensity_mj_per_tkm": energy_intensity_kwh_per_tkm * 3.6,
             "assumptions": asdict(values),
         }
     return {
@@ -141,6 +171,7 @@ def scenario_table(result: dict):
             "Energia/dia (kWh)": values["daily_energy_kwh"],
             "Potência média (kW)": values["mean_power_kw"],
             "Pico do perfil (kW)": values["profile_peak_kw"],
+            "Intensidade (kWh/t·km)": values["energy_intensity_kwh_per_tkm"],
         }
         for label, values in result["scenarios"].items()
     ]

@@ -15,6 +15,15 @@ Integrar os carregamentos rodoviários do PNL 2050 ao dimensionamento do eletrop
 7. Distribuição da energia em 24 horas por perfil representativo normalizado.
 8. Simulação do perfil no modelo existente, sujeita à BDGD, demanda contratada opcional, smart charging, metas de atendimento, FV e BESS.
 
+## Referências ICCT/VECTO incorporadas
+
+A interface passou a oferecer dois ciclos operacionais de referência para tecnologia 2023:
+
+- Long-Haul (LH): carga útil de 19,3 t e consumo de 1,38 kWh/km, equivalentes a 0,0715 kWh/t·km (0,2574 MJ/t·km).
+- Regional Delivery (RD): carga útil de 12,9 t e consumo de 0,93 kWh/km, equivalentes a 0,0721 kWh/t·km (0,2595 MJ/t·km).
+
+Os valores são referências europeias dos ciclos VECTO empregados pelo ICCT. O usuário pode selecionar `Personalizado` e alterar carga útil e consumo. A intensidade energética é registrada para rastreabilidade e futura análise por tonelada-quilômetro; a demanda atual do eletroposto permanece calculada pelo método de viagens, participação elétrica, captura e energia por parada, evitando dupla contagem da carga útil.
+
 As equações centrais são:
 
 `viagens_carregadas_ano = toneladas_ano / carga_util_t`

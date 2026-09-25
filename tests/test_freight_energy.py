@@ -1,10 +1,20 @@
 import math
 
 from src.freight_energy import (
+    ICCT_OPERATION_CYCLES,
     FreightAssumptions,
     estimate_freight_charging,
     normalized_freight_profile,
 )
+
+
+def test_icct_reference_cycles_and_intensities():
+    lh = ICCT_OPERATION_CYCLES["Long-Haul (LH)"]
+    rd = ICCT_OPERATION_CYCLES["Regional Delivery (RD)"]
+    assert math.isclose(lh["payload_t"], 19.3)
+    assert math.isclose(rd["payload_t"], 12.9)
+    assert math.isclose(lh["energy_consumption_kwh_per_km"] / lh["payload_t"], 0.0715025907)
+    assert math.isclose(rd["energy_consumption_kwh_per_km"] / rd["payload_t"], 0.0720930233)
 
 
 def test_hourly_profile_is_normalized():
@@ -16,7 +26,9 @@ def test_hourly_profile_is_normalized():
 
 def test_conversion_keeps_physical_trips_separate_from_traffic_equivalence():
     assumptions = FreightAssumptions(
+        operation_cycle="Personalizado",
         payload_t=25,
+        energy_consumption_kwh_per_km=1.25,
         empty_returns_per_loaded_trip=0.5,
         electric_share=0.2,
         station_capture_share=0.25,

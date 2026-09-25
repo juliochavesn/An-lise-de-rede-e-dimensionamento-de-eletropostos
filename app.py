@@ -22,7 +22,12 @@ from src.technical_ui import render_technical_panel
 from src.service_policy import describe_policy
 from src.cloud_bdgd import CLOUD_DATASETS, load_cloud_coverage, prepare_cloud_point
 from src.pnl_routes import add_pnl_layer, gtype_label, load_pnl_window
-from src.freight_energy import FreightAssumptions, estimate_freight_charging, scenario_table
+from src.freight_energy import (
+    ICCT_OPERATION_CYCLES,
+    FreightAssumptions,
+    estimate_freight_charging,
+    scenario_table,
+)
 from access_counter import register_access, render_access_footer
 
 
@@ -173,6 +178,7 @@ st.markdown("""
 analysis_mode = st.sidebar.radio(
     "Modo de análise",
     ["Preliminar — APIs online", "Detalhada — BDGD em nuvem", "Detalhada — BDGD local"],
+    index=1,
     key="analysis_mode",
 )
 st.sidebar.caption("① Escolha a fonte  ·  ② Selecione o ponto  ·  ③ Analise e simule")
@@ -356,7 +362,7 @@ with st.sidebar:
         include_uncertain = st.checkbox("Incluir acesso condicionado ou não informado", value=False)
         st.caption("Fonte: Open Charge Map. Cache de 6 h; estado cadastral, não ocupação em tempo real.")
     show_pnl = st.toggle(
-        "Exibir rotas de transporte de cargas (PNL)", value=False,
+        "Exibir rotas de transporte de cargas (PNL)", value=True,
         help="Camada logística independente da BDGD. O primeiro acesso baixa e prepara o pacote mantido no Google Drive.",
     )
     pnl_radius_km, pnl_display_mode = 15.0, "Saturação"
@@ -374,25 +380,56 @@ with st.sidebar:
             "se aplica apenas aos links rodoviários."
         )
         use_freight_demand = st.toggle(
-            "Converter fluxo PNL em demanda de recarga", value=False,
+            "Converter fluxo PNL em demanda de recarga", value=True,
             help="Ativa cenários auditáveis; hipóteses de frota e recarga não são dados oficiais do PNL.",
         )
         if use_freight_demand:
             freight_scenario = st.selectbox("Cenário logístico aplicado", ["P10", "P50", "P90"], index=1)
             with st.expander("Hipóteses centrais da conversão"):
-                payload_t = st.number_input("Carga útil média (t/viagem)", 1.0, 100.0, 30.0, 1.0)
+                cycle_options = list(ICCT_OPERATION_CYCLES) + ["Personalizado"]
+                operation_cycle = st.selectbox(
+                    "Ciclo operacional de referência",
+                    cycle_options,
+                    help=(
+                        "As referências ICCT/VECTO usam 19,3 t e 1,38 kWh/km para "
+                        "Long-Haul; 12,9 t e 0,93 kWh/km para Regional Delivery."
+                    ),
+                )
+                cycle_reference = ICCT_OPERATION_CYCLES.get(
+                    operation_cycle, ICCT_OPERATION_CYCLES["Long-Haul (LH)"]
+                )
+                cycle_key = "custom" if operation_cycle == "Personalizado" else operation_cycle
+                payload_t = st.number_input(
+                    "Carga útil média (t/viagem)", 1.0, 100.0,
+                    float(cycle_reference["payload_t"]), 0.1,
+                    key=f"freight_payload_{cycle_key}",
+                )
+                energy_consumption = st.number_input(
+                    "Consumo energético do caminhão (kWh/km)", 0.1, 5.0,
+                    float(cycle_reference["energy_consumption_kwh_per_km"]), 0.01,
+                    key=f"freight_consumption_{cycle_key}",
+                )
                 empty_ratio = st.number_input("Retornos vazios por viagem carregada", 0.0, 2.0, 0.35, 0.05)
                 electric_share = st.number_input("Participação elétrica (%)", 0.0, 100.0, 15.0, 1.0) / 100
                 capture_share = st.number_input("Captura pelo eletroposto (%)", 0.0, 100.0, 20.0, 1.0) / 100
                 energy_stop = st.number_input("Energia por parada (kWh)", 1.0, 1500.0, 250.0, 10.0)
                 operating_days = st.number_input("Dias operacionais por ano", 1, 366, 365, 1)
                 freight_assumptions = FreightAssumptions(
+                    operation_cycle=operation_cycle,
                     payload_t=payload_t,
+                    energy_consumption_kwh_per_km=energy_consumption,
                     empty_returns_per_loaded_trip=empty_ratio,
                     electric_share=electric_share,
                     station_capture_share=capture_share,
                     energy_per_stop_kwh=energy_stop,
                     operating_days_per_year=int(operating_days),
+                )
+                st.caption(
+                    "Intensidade carregada: "
+                    f"{energy_consumption / payload_t:.4f} kWh/t·km "
+                    f"({energy_consumption / payload_t * 3.6:.4f} MJ/t·km). "
+                    "Esse indicador documenta o ciclo; a demanda do eletroposto continua "
+                    "sendo calculada por viagens, captura e energia por parada."
                 )
                 st.caption("P10 e P90 variam todas as hipóteses em torno destes valores; P50 usa os valores informados.")
     threshold_kw = st.number_input("Limiar crítico (kW)", min_value=0.0, value=250.0, step=25.0)

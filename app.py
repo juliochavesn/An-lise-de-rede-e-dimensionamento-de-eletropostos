@@ -300,7 +300,7 @@ def cached_map(latitude: float, longitude: float, radius_km: float, source_path)
 
 @st.cache_data(show_spinner=False, ttl=86400)
 def cached_pnl_window(latitude: float, longitude: float, radius_km: float,
-                      schema_version: str = "pnl-dictionary-v1"):
+                      schema_version: str = "pnl-dictionary-v2-light-map"):
     del schema_version
     return load_pnl_window(latitude, longitude, radius_km)
 
@@ -836,6 +836,11 @@ elif pnl_data:
         scope_metrics[1].metric("Trechos rodoviários", pnl_data["road_segment_count"])
         scope_metrics[0].metric("Corredores classificados", pnl_data["corridor_segment_count"])
         scope_metrics[1].metric("Links com saturação ≥80%", pnl_data["high_saturation_count"])
+        if pnl_data["displayed_segment_count"] < pnl_data["segment_count"]:
+            st.caption(
+                f"Mapa otimizado: exibe {pnl_data['displayed_segment_count']} trechos priorizados; "
+                f"os indicadores consideram todos os {pnl_data['segment_count']} trechos do raio."
+            )
         st.warning(pnl_data["interpretation_warning"])
         if use_freight_demand and not is_road:
             st.info("A conversão em recarga não foi aplicada porque o segmento mais próximo não é rodoviário.")

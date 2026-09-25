@@ -137,7 +137,7 @@ def saturation_class(value) -> str:
 
 
 def load_pnl_window(latitude: float, longitude: float, radius_km: float = 15.0,
-                    max_map_features: int = 5000) -> dict:
+                    max_map_features: int = 900) -> dict:
     """Retorna rotas PNL no raio e indicadores do segmento mais próximo."""
     import geopandas as gpd
     import pyogrio
@@ -182,7 +182,10 @@ def load_pnl_window(latitude: float, longitude: float, radius_km: float = 15.0,
     nearest_index = routes["distance_km"].idxmin()
     nearest = routes.loc[nearest_index]
 
-    # Prioriza corredores, fluxos e trechos próximos para manter o mapa leve.
+    # Os indicadores usam todos os trechos do recorte. Somente a camada visual é
+    # limitada, priorizando corredores, fluxos e proximidade, para evitar que o
+    # navegador ou uma instância pequena do Streamlit esgote memória ao serializar
+    # milhares de geometrias de uma só vez.
     routes["corridor_priority"] = routes[_CORRIDORS].fillna(0).max(axis=1)
     map_routes = routes.sort_values(
         ["corridor_priority", "total_flow", "distance_km"],

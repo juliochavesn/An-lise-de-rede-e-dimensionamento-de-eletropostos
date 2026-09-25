@@ -1085,6 +1085,8 @@ if "simulation_result" in st.session_state:
     summary_labels = {
         "config": "Configuração", "solve_status": "Estado da solução",
         "objective_value": "Custo líquido no horizonte (R$)",
+        "charger_power_installed_kw": "Potência instalada dos carregadores (kW)",
+        "charger_capex_brl": "Investimento nos carregadores (R$)",
         "pv_size_kw": "Solar (kW)", "bess_e_kwh": "Bateria (kWh)",
         "bess_p_kw": "Potência da bateria (kW)",
         "contracted_demand_kw": "Demanda contratada (kW)",

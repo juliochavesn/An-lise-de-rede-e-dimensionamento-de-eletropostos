@@ -41,6 +41,9 @@ def build_ampl_cost_parameters(costs, horizon_h):
         raise ValueError("horizon_h deve ser positivo.")
 
     required = {
+        "charger_capex_per_kw",
+        "charger_fixed_om_per_kw_year",
+        "charger_economic_lifetime_years",
         "pv_capex_per_kwp",
         "pv_fixed_om_per_kwp_year",
         "pv_economic_lifetime_years",
@@ -78,6 +81,15 @@ def build_ampl_cost_parameters(costs, horizon_h):
             "A fração de reposição deve estar entre 0 e 1."
         )
     return {
+        "charger_capex_per_kw":
+            float(costs["charger_capex_per_kw"]),
+        "charger_fixed_om_per_kw_year":
+            float(costs["charger_fixed_om_per_kw_year"]),
+        "charger_capital_recovery_factor":
+            capital_recovery_factor(
+                rate,
+                costs["charger_economic_lifetime_years"],
+            ),
         "pv_capex_per_kwp":
             float(costs["pv_capex_per_kwp"]),
         "pv_fixed_om_per_kwp_year":

@@ -144,6 +144,10 @@ def extract_results(config, ampl):
     # VARIÁVEIS DE DIMENSIONAMENTO
     # =========================================================
 
+    charger_power_installed_kw = float(
+        _get_scalar(ampl, "charger_power_installed_kw")
+    )
+
     pv_size_kw = float(
         _get_scalar(ampl, "pv_size_kw")
     )
@@ -162,6 +166,15 @@ def extract_results(config, ampl):
 
     pv_capex_per_kwp = float(
         _get_scalar(ampl, "pv_capex_per_kwp")
+    )
+    charger_capex_per_kw = float(
+        _get_scalar(ampl, "charger_capex_per_kw")
+    )
+    charger_fixed_om_per_kw_year = float(
+        _get_scalar(ampl, "charger_fixed_om_per_kw_year")
+    )
+    charger_capital_recovery_factor = float(
+        _get_scalar(ampl, "charger_capital_recovery_factor")
     )
     pv_fixed_om_per_kwp_year = float(
         _get_scalar(ampl, "pv_fixed_om_per_kwp_year")
@@ -215,6 +228,11 @@ def extract_results(config, ampl):
         ampl, "demand_exceedance_kw"
     )
 
+    charger_capex_brl = charger_power_installed_kw * charger_capex_per_kw
+    charger_annualized_cost_brl_year = charger_power_installed_kw * (
+        charger_capex_per_kw * charger_capital_recovery_factor
+        + charger_fixed_om_per_kw_year
+    )
     pv_capex_brl = pv_size_kw * pv_capex_per_kwp
     pv_annualized_cost_brl_year = pv_size_kw * (
         pv_capex_per_kwp * pv_capital_recovery_factor
@@ -233,7 +251,8 @@ def extract_results(config, ampl):
     investment_cost_in_horizon_brl = (
         horizon_weight_years
         * (
-            pv_annualized_cost_brl_year
+            charger_annualized_cost_brl_year
+            + pv_annualized_cost_brl_year
             + bess_annualized_cost_brl_year
         )
     )
@@ -505,6 +524,15 @@ def extract_results(config, ampl):
         "bess_soc_max_frac": float(_get_scalar(ampl, "bess_soc_max_frac")),
 
         "config": config,
+
+        "charger_power_installed_kw":
+            charger_power_installed_kw,
+
+        "charger_capex_brl":
+            charger_capex_brl,
+
+        "charger_annualized_cost_brl_year":
+            charger_annualized_cost_brl_year,
 
         "objective_value":
             float(_get_scalar(ampl, "Total_Cost")),

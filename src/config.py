@@ -136,8 +136,10 @@ if SYSTEM_OPTIONS["enable_pv"] and SYSTEM_OPTIONS["enable_bess"]:
 # ============================================================
 
 LIMITS = {
-    # Potência máxima total dos carregadores EV no site [kW].
-    "charger_max_kw": 300.0,
+    # Teto de busca para a potência total instalada dos carregadores [kW].
+    # A potência efetivamente instalada é uma variável da otimização.
+    # Este teto evita um domínio ilimitado e pode ser ampliado para hubs maiores.
+    "charger_max_kw": 3000.0,
 
     # Prazo máximo para atender energia EV postergada [h].
     # A parcela não atendida após essa janela expira e é registrada
@@ -193,6 +195,14 @@ LIMITS = {
 COSTS = {
     # Todos os valores monetários estão em reais constantes (BRL)
     # com data-base dezembro de 2024. Não usar "mil R$".
+    #
+    # CARREGADORES RÁPIDOS DC — PREMISSA PARAMÉTRICA:
+    # Custo instalado por kW de potência simultânea do eletroposto. O valor
+    # deve ser atualizado com cotações do projeto executivo; permanece separado
+    # dos custos de rede, demanda contratada, FV e BESS.
+    "charger_capex_per_kw": 1800.0,          # [R$/kW instalado]
+    "charger_fixed_om_per_kw_year": 36.0,   # [R$/kW.ano]
+    "charger_economic_lifetime_years": 10.0,
     #
     # FONTE FV:
     # EPE/MME, PDE 2035 - Caderno de Parâmetros de Custos de

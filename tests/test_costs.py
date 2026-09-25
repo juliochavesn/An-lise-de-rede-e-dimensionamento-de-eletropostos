@@ -22,6 +22,9 @@ def test_zero_discount_rate_uses_straight_line_recovery():
 
 def test_cost_parameters_convert_24_hours_to_one_day_of_year():
     costs = {
+        "charger_capex_per_kw": 1800.0,
+        "charger_fixed_om_per_kw_year": 36.0,
+        "charger_economic_lifetime_years": 10.0,
         "pv_capex_per_kwp": 3500.0,
         "pv_fixed_om_per_kwp_year": 60.0,
         "pv_economic_lifetime_years": 25.0,
@@ -41,6 +44,9 @@ def test_cost_parameters_convert_24_hours_to_one_day_of_year():
     params = build_ampl_cost_parameters(costs, horizon_h=24.0)
 
     assert params["horizon_weight_years"] == pytest.approx(1.0 / 365.0)
+    assert params["charger_capital_recovery_factor"] == pytest.approx(
+        capital_recovery_factor(0.08, 10)
+    )
     assert params["pv_capital_recovery_factor"] == pytest.approx(
         capital_recovery_factor(0.08, 25)
     )

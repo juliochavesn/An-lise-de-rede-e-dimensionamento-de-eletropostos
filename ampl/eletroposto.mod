@@ -86,7 +86,7 @@ param export_limit_kw >= 0;
 # LIMITES TECNOLÓGICOS
 # ============================================================
 
-# Potência máxima total dos carregadores [kW].
+# Teto de dimensionamento da potência total dos carregadores [kW].
 param charger_max_kw >= 0;
 param ev_max_delay_steps integer >= 1;
 param maximum_pv_curtailment_fraction >= 0, <= 1;
@@ -129,6 +129,10 @@ param bess_duration_max_h >= bess_duration_min_h;
 # ============================================================
 
 # Custos reais, anualização e peso temporal.
+param charger_capex_per_kw >= 0;                 # [R$/kW instalado]
+param charger_fixed_om_per_kw_year >= 0;         # [R$/kW.ano]
+param charger_capital_recovery_factor >= 0;      # [1/ano]
+
 param pv_capex_per_kwp >= 0;              # [R$/kWp]
 param pv_fixed_om_per_kwp_year >= 0;      # [R$/kWp.ano]
 param pv_capital_recovery_factor >= 0;    # [1/ano]
@@ -301,6 +305,10 @@ var expired_unserved_kwh {T} >= 0;
 # Potência ótima instalada FV [kW].
 var pv_size_kw >= 0, <= pv_max_kw;
 
+# Potência simultânea total de recarga instalada no eletroposto [kW].
+# O modelo escolhe este valor conforme demanda, rede e custo.
+var charger_power_installed_kw >= 0, <= charger_max_kw;
+
 # Potência FV utilizada [kW].
 var p_pv_used_kw {T} >= 0;
 
@@ -385,7 +393,7 @@ subject to Grid_Export_Limit {t in T}:
 
 # Limite físico dos carregadores.
 subject to Charger_Limit {t in T}:
-    p_served_kw[t] <= charger_max_kw;
+    p_served_kw[t] <= charger_power_installed_kw;
 
 # No modo econômico, agrega no intervalo t toda energia despachada
 # para as diferentes coortes de chegada e a liga ao balanço geral EV.
@@ -735,10 +743,23 @@ minimize EV_Backlog_Objective:
 minimize Total_Cost:
 
     # ========================================================
+    # INVESTIMENTO NA POTÊNCIA DOS CARREGADORES
+    # ========================================================
+
+    horizon_weight_years
+        * (
+            charger_capex_per_kw
+            * charger_capital_recovery_factor
+            + charger_fixed_om_per_kw_year
+        )
+        * charger_power_installed_kw
+
+
+    # ========================================================
     # CUSTO ENERGIA DA REDE
     # ========================================================
 
-    sum {t in T}
+    + sum {t in T}
 
         p_grid_import_kw[t]
         * price_grid[t]
